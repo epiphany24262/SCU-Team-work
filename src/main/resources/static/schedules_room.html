@@ -1,0 +1,273 @@
+<link rel="stylesheet" href="css/schedules_room.css">
+
+<div class="room-management">
+    <h1 class="page-title">教室管理</h1>
+    <!-- 工具栏 -->
+    <div class="toolbar">
+        <el-button type="primary" @click="handleAddRoom" icon="el-icon-plus">
+            添加教室
+        </el-button>
+
+        <div class="search-box">
+            <el-input
+                    v-model="searchKeyword"
+                    placeholder="搜索教室名称"
+                    clearable
+                    @clear="handleSearch"
+                    @keyup.enter="handleSearch"
+                    style="width: 300px;"
+            >
+                <template #append>
+                    <el-button @click="handleSearch" icon="el-icon-search"></el-button>
+                </template>
+            </el-input>
+        </div>
+    </div>
+
+    <!-- 教室表格 -->
+    <div class="table-container">
+        <el-table
+                :data="rooms"
+                v-loading="loading"
+                empty-text="暂无教室数据"
+                style="width: 100%"
+        >
+            <el-table-column prop="id" label="ID" width="80"></el-table-column>
+            <el-table-column prop="name" label="教室名称" min-width="150"></el-table-column>
+            <el-table-column prop="capacity" label="容量" width="100">
+                <template slot-scope="scope">
+                    <el-tag>{{ scope.row.capacity }}人</el-tag>
+                </template>
+            </el-table-column>
+            <el-table-column prop="equipment" label="设备信息" min-width="200"></el-table-column>
+            <el-table-column label="操作" width="200" fixed="right">
+                <template slot-scope="scope">
+                    <div class="action-buttons">
+                        <el-button
+                                size="small"
+                                @click="handleEditRoom(scope.row)"
+                                icon="el-icon-edit"
+                        >
+                            编辑
+                        </el-button>
+                        <el-button
+                                size="small"
+                                type="danger"
+                                @click="handleDeleteRoom(scope.row)"
+                                icon="el-icon-delete"
+                        >
+                            删除
+                        </el-button>
+                    </div>
+                </template>
+            </el-table-column>
+        </el-table>
+    </div>
+
+    <!-- 分页 -->
+    <div class="pagination">
+        <el-pagination
+                :current-page="currentPage"
+                :page-size="pageSize"
+                :page-sizes="[10, 20, 50, 100]"
+                :total="total"
+                layout="total, sizes, prev, pager, next, jumper"
+                @size-change="handleSizeChange"
+                @current-change="handleCurrentChange"
+        />
+    </div>
+
+    <!-- 添加/编辑教室对话框 -->
+    <el-dialog
+            :title="dialogTitle"
+            :visible.sync="dialogVisible"
+            width="500px"
+            @close="handleDialogClose"
+    >
+        <el-form :model="roomForm" :rules="rules" ref="roomForm" label-width="100px">
+            <el-form-item label="教室名称" prop="name">
+                <el-input v-model="roomForm.name" placeholder="请输入教室名称"></el-input>
+            </el-form-item>
+            <el-form-item label="容量" prop="capacity">
+                <el-input-number
+                        v-model="roomForm.capacity"
+                        :min="1"
+                        :max="100"
+                        placeholder="请输入容量"
+                ></el-input-number>
+            </el-form-item>
+            <el-form-item label="设备信息">
+                <el-input
+                        type="textarea"
+                        :rows="3"
+                        v-model="roomForm.equipment"
+                        placeholder="请输入设备信息"
+                ></el-input>
+            </el-form-item>
+        </el-form>
+        <div slot="footer" class="dialog-footer">
+            <el-button @click="dialogVisible = false">取消</el-button>
+            <el-button type="primary" @click="handleSubmit" :loading="submitting">确定</el-button>
+        </div>
+    </el-dialog>
+</div>
+
+<script>
+    new Vue({
+        el: '.room-management',
+        data() {
+            return {
+                rooms: [],
+                loading: false,
+                currentPage: 1,
+                pageSize: 10,
+                total: 0,
+                searchKeyword: '',
+                dialogVisible: false,
+                dialogTitle: '添加教室',
+                submitting: false,
+                roomForm: {
+                    id: null,
+                    name: '',
+                    capacity: 10,
+                    equipment: ''
+                },
+                rules: {
+                    name: [
+                        { required: true, message: '请输入教室名称', trigger: 'blur' },
+                        { min: 2, max: 50, message: '长度在 2 到 50 个字符', trigger: 'blur' }
+                    ],
+                    capacity: [
+                        { required: true, message: '请输入容量', trigger: 'blur' }
+                    ]
+                }
+            }
+        },
+        mounted() {
+            this.loadRooms();
+        },
+        methods: {
+            // 加载教室列表
+            loadRooms() {
+                this.loading = true;
+                axios.get('/api/rooms', {
+                    params: {
+                        page: this.currentPage,
+                        pageSize: this.pageSize,
+                        keyword: this.searchKeyword
+                    }
+                }).then(response => {
+                    if (response.data.success) {
+                        this.rooms = response.data.data;
+                        this.total = response.data.total;
+                    } else {
+                        this.$message.error(response.data.message || '加载失败');
+                    }
+                }).catch(error => {
+                    console.error('加载失败:', error);
+                    this.$message.error('加载失败');
+                }).finally(() => {
+                    this.loading = false;
+                });
+            },
+
+            // 添加教室
+            handleAddRoom() {
+                this.dialogTitle = '添加教室';
+                this.roomForm = {
+                    id: null,
+                    name: '',
+                    capacity: 10,
+                    equipment: ''
+                };
+                this.dialogVisible = true;
+            },
+
+            // 编辑教室
+            handleEditRoom(room) {
+                this.dialogTitle = '编辑教室';
+                this.roomForm = {
+                    id: room.id,
+                    name: room.name,
+                    capacity: room.capacity,
+                    equipment: room.equipment || ''
+                };
+                this.dialogVisible = true;
+            },
+
+            // 删除教室
+            handleDeleteRoom(room) {
+                this.$confirm(`确定要删除教室 "${room.name}" 吗？`, '删除确认', {
+                    confirmButtonText: '确定',
+                    cancelButtonText: '取消',
+                    type: 'warning',
+                }).then(() => {
+                    axios.delete(`/api/rooms/${room.id}`)
+                        .then(response => {
+                            if (response.data.success) {
+                                this.$message.success('删除成功');
+                                this.loadRooms();
+                            } else {
+                                this.$message.error(response.data.message || '删除失败');
+                            }
+                        })
+                        .catch(error => {
+                            console.error('删除失败:', error);
+                            this.$message.error('删除失败');
+                        });
+                }).catch(() => {});
+            },
+
+            // 提交表单
+            handleSubmit() {
+                this.$refs.roomForm.validate((valid) => {
+                    if (!valid) return;
+
+                    this.submitting = true;
+                    const request = this.roomForm.id
+                        ? axios.put(`/api/rooms/${this.roomForm.id}`, this.roomForm)
+                        : axios.post('/api/rooms', this.roomForm);
+
+                    request.then(response => {
+                        if (response.data.success) {
+                            this.$message.success(this.roomForm.id ? '更新成功' : '添加成功');
+                            this.dialogVisible = false;
+                            this.loadRooms();
+                        } else {
+                            this.$message.error(response.data.message || '操作失败');
+                        }
+                    }).catch(error => {
+                        console.error('操作失败:', error);
+                        this.$message.error('操作失败');
+                    }).finally(() => {
+                        this.submitting = false;
+                    });
+                });
+            },
+
+            // 对话框关闭
+            handleDialogClose() {
+                this.$refs.roomForm.clearValidate();
+            },
+
+            // 搜索
+            handleSearch() {
+                this.currentPage = 1;
+                this.loadRooms();
+            },
+
+            // 分页大小改变
+            handleSizeChange(newSize) {
+                this.pageSize = newSize;
+                this.currentPage = 1;
+                this.loadRooms();
+            },
+
+            // 当前页改变
+            handleCurrentChange(newPage) {
+                this.currentPage = newPage;
+                this.loadRooms();
+            }
+        }
+    });
+</script>

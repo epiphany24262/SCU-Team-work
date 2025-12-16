@@ -1,0 +1,310 @@
+.myvip-container {
+    padding: 20px;
+}
+
+.card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.section-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: #303133;
+    margin-bottom: 15px;
+}
+
+.vip-status-section, .vip-action-section {
+    padding: 20px;
+}
+
+/* VIP卡片样式 */
+.vip-card {
+    background: white;
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+    margin-bottom: 20px;
+}
+
+.vip-card.vip-active .vip-card-header {
+    background: linear-gradient(135deg, #E6A23C 0%, #F56C6C 100%);
+}
+
+.vip-card.vip-inactive .vip-card-header {
+    background: linear-gradient(135deg, #909399 0%, #606266 100%);
+}
+
+.vip-card-header {
+    color: white;
+    padding: 20px;
+    text-align: center;
+}
+
+.vip-card-header i {
+    font-size: 32px;
+    display: block;
+    margin-bottom: 10px;
+}
+
+.vip-level {
+    font-size: 18px;
+    font-weight: 600;
+}
+
+.vip-card-content {
+    padding: 20px;
+}
+
+.vip-benefits h4 {
+    color: #303133;
+    margin-bottom: 15px;
+}
+
+.vip-benefits ul {
+    list-style: none;
+    padding: 0;
+}
+
+.vip-benefits li {
+    margin-bottom: 10px;
+    color: #606266;
+}
+
+.vip-benefits i {
+    color: #67C23A;
+    margin-right: 10px;
+}
+
+.vip-card-footer {
+    background: #f5f7fa;
+    padding: 15px;
+    text-align: center;
+}
+
+.status-indicator i {
+    font-size: 18px;
+    margin-right: 8px;
+}
+
+.status-indicator .el-icon-success {
+    color: #67C23A;
+}
+
+.status-indicator .el-icon-warning {
+    color: #E6A23C;
+}
+
+/* VIP信息区 */
+.vip-info-section {
+    margin-top: 30px;
+}
+
+/* VIP套餐选择 */
+.vip-plans {
+    margin-bottom: 20px;
+}
+
+.plan-card {
+    background: white;
+    border: 2px solid #ebeef5;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 15px;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.plan-card:hover {
+    border-color: #409EFF;
+    transform: translateY(-2px);
+}
+
+.el-radio.is-checked .plan-card {
+    border-color: #409EFF;
+    background: #f0f9ff;
+}
+
+.plan-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.plan-name {
+    font-size: 16px;
+    font-weight: 600;
+    color: #303133;
+}
+
+.plan-price {
+    color: #F56C6C;
+    font-size: 24px;
+    font-weight: bold;
+}
+
+.plan-duration {
+    color: #909399;
+    font-size: 14px;
+    margin-bottom: 15px;
+}
+
+.plan-features {
+    margin-bottom: 10px;
+}
+
+.feature-item {
+    color: #606266;
+    font-size: 14px;
+    margin-bottom: 8px;
+}
+
+.feature-item i {
+    color: #67C23A;
+    margin-right: 8px;
+}
+
+.plan-save {
+    color: #67C23A;
+    font-weight: 600;
+    font-size: 14px;
+}
+
+/* 支付信息汇总 */
+.payment-summary {
+    margin-top: 20px;
+}
+
+.total-amount {
+    color: #F56C6C;
+    font-size: 20px;
+    font-weight: bold;
+}
+
+/* VIP协议 */
+.vip-agreement {
+    margin-top: 20px;
+    text-align: center;
+    color: #909399;
+    font-size: 14px;
+}
+
+.vip-agreement a {
+    color: #409EFF;
+    margin-left: 10px;
+    text-decoration: none;
+}
+
+.vip-agreement a:hover {
+    text-decoration: underline;
+}
+
+/* VIP消费记录 */
+.vip-record-section {
+    margin-top: 30px;
+}
+
+/* 支付弹窗样式（复用mycard的样式） */
+.payment-dialog {
+    padding: 10px;
+}
+
+.payment-dialog h3 {
+    margin-bottom: 15px;
+    color: #303133;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.payment-info-section,
+.payment-method-section,
+.qrcode-section {
+    margin-bottom: 25px;
+}
+
+.payment-method-option {
+    margin-bottom: 10px;
+    border: 1px solid #ebeef5;
+    border-radius: 6px;
+    padding: 15px;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.payment-method-option:hover {
+    border-color: #409EFF;
+    background-color: #f0f9ff;
+}
+
+.payment-method-content {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 16px;
+}
+
+.payment-method-content i {
+    font-size: 20px;
+}
+
+.payment-method-content .el-icon-s-finance {
+    color: #1677FF;
+}
+
+.payment-method-content .el-icon-s-promotion {
+    color: #07C160;
+}
+
+.el-radio.is-checked .payment-method-option {
+    border-color: #409EFF;
+    background-color: #f0f9ff;
+}
+
+.qrcode-container {
+    text-align: center;
+    padding: 20px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    margin: 15px 0;
+}
+
+.qrcode-image {
+    width: 200px;
+    height: 200px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+.qrcode-hint {
+    text-align: center;
+    color: #666;
+    font-size: 14px;
+    margin-top: 10px;
+}
+
+.payment-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 15px;
+    margin-top: 25px;
+    padding-top: 20px;
+    border-top: 1px solid #ebeef5;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+    .el-dialog__wrapper .el-dialog {
+        width: 90% !important;
+    }
+
+    .qrcode-image {
+        width: 150px;
+        height: 150px;
+    }
+
+    .plan-price {
+        font-size: 20px;
+    }
+}

@@ -1,0 +1,370 @@
+<link rel="stylesheet" href="css/user_home.css">
+
+<div class="user-home-container">
+    <!-- 用户欢迎区域 -->
+    <el-row :gutter="20" class="user-welcome-section">
+        <el-col :span="16">
+            <el-card class="welcome-card" shadow="hover">
+                <div class="welcome-header">
+                    <h1 class="welcome-title">
+                        欢迎回来，
+                        <span class="username">{{currentUser.username || '会员'}}</span>！
+                    </h1>
+                    <p class="welcome-subtitle">{{currentDate}}，祝您健身愉快！</p>
+                </div>
+
+                <el-row :gutter="20" class="user-info-cards">
+                    <el-col :span="8">
+                        <div class="info-card">
+                            <div class="info-icon" style="background-color: #409EFF;">
+                                <i class="el-icon-s-custom"></i>
+                            </div>
+                            <div class="info-content">
+                                <div class="info-label">会员卡号</div>
+                                <div class="info-value">GYM-{{formatUserId(currentUser.id)}}</div>
+                            </div>
+                        </div>
+                    </el-col>
+                    <el-col :span="8">
+                        <div class="info-card">
+                            <div class="info-icon" style="background-color: #67C23A;">
+                                <i class="el-icon-s-flag"></i>
+                            </div>
+                            <div class="info-content">
+                                <div class="info-label">会员等级</div>
+                                <div class="info-value">{{getUserRoleText(currentUser.role)}}</div>
+                            </div>
+                        </div>
+                    </el-col>
+                    <el-col :span="8">
+                        <div class="info-card">
+                            <div class="info-icon" style="background-color: #E6A23C;">
+                                <i class="el-icon-date"></i>
+                            </div>
+                            <div class="info-content">
+                                <div class="info-label">到期时间</div>
+                                <div class="info-value">{{currentUser.expireTime || '未设置'}}</div>
+                            </div>
+                        </div>
+                    </el-col>
+                </el-row>
+            </el-card>
+        </el-col>
+
+        <el-col :span="8">
+            <el-card class="avatar-card" shadow="hover">
+                <div class="avatar-content">
+                    <!-- 使用 Element Avatar 组件 -->
+                    <el-avatar :size="80" src="images/default-avatar.png"></el-avatar>
+                    <div class="avatar-quote">
+                        <p>"健康是人生的第一财富"</p>
+                        <p class="quote-author">—— 爱默生</p>
+                    </div>
+                </div>
+            </el-card>
+        </el-col>
+    </el-row>
+
+    <!-- 今日推荐 -->
+    <el-card class="section-card" shadow="never">
+        <div slot="header" class="section-header">
+            <span class="section-title">
+                <i class="el-icon-star-on"></i>
+                今日推荐
+            </span>
+            <span class="section-subtitle">为您精选的今日训练计划</span>
+        </div>
+
+        <el-row :gutter="20">
+            <el-col :span="8">
+                <el-card class="recommendation-card" shadow="hover">
+                    <div class="rec-header" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                        <i class="el-icon-fork-spoon"></i>
+                        <h3>力量训练</h3>
+                    </div>
+                    <div class="rec-content">
+                        <el-descriptions :column="1" size="small">
+                            <el-descriptions-item label="训练时长">60分钟</el-descriptions-item>
+                            <el-descriptions-item label="适合人群">增肌塑形</el-descriptions-item>
+                            <el-descriptions-item label="推荐器材">哑铃、杠铃</el-descriptions-item>
+                        </el-descriptions>
+                        <el-button type="primary" size="small" style="width: 100%; margin-top: 15px;"
+                                   @click="goToPage('reserve_equipment')">
+                            预约器材
+                        </el-button>
+                    </div>
+                </el-card>
+            </el-col>
+
+            <el-col :span="8">
+                <el-card class="recommendation-card" shadow="hover">
+                    <div class="rec-header" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
+                        <i class="el-icon-suitcase-1"></i>
+                        <h3>有氧训练</h3>
+                    </div>
+                    <div class="rec-content">
+                        <el-descriptions :column="1" size="small">
+                            <el-descriptions-item label="训练时长">45分钟</el-descriptions-item>
+                            <el-descriptions-item label="适合人群">减脂瘦身</el-descriptions-item>
+                            <el-descriptions-item label="推荐器材">跑步机、动感单车</el-descriptions-item>
+                        </el-descriptions>
+                        <el-button type="primary" size="small" style="width: 100%; margin-top: 15px;"
+                                   @click="goToPage('reserve_equipment')">
+                            预约器材
+                        </el-button>
+                    </div>
+                </el-card>
+            </el-col>
+
+            <el-col :span="8">
+                <el-card class="recommendation-card" shadow="hover">
+                    <div class="rec-header" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);">
+                        <i class="el-icon-s-promotion"></i>
+                        <h3>瑜伽课程</h3>
+                    </div>
+                    <div class="rec-content">
+                        <el-descriptions :column="1" size="small">
+                            <el-descriptions-item label="课程时间">19:00-20:00</el-descriptions-item>
+                            <el-descriptions-item label="授课教练">王老师</el-descriptions-item>
+                            <el-descriptions-item label="课程地点">A区瑜伽室</el-descriptions-item>
+                        </el-descriptions>
+                        <el-button type="success" size="small" style="width: 100%; margin-top: 15px;"
+                                   @click="goToPage('reserve_course')">
+                            预约课程
+                        </el-button>
+                    </div>
+                </el-card>
+            </el-col>
+        </el-row>
+    </el-card>
+
+    <!-- 我的健身数据 -->
+    <el-card class="section-card" shadow="never">
+        <div slot="header" class="section-header">
+            <span class="section-title">
+                <i class="el-icon-data-line"></i>
+                我的健身数据
+            </span>
+            <span class="section-subtitle">本周训练统计</span>
+        </div>
+
+        <el-row :gutter="20">
+            <el-col :span="6">
+                <div class="stat-card">
+                    <div class="stat-icon" style="color: #409EFF;">
+                        <i class="el-icon-s-data"></i>
+                    </div>
+                    <div class="stat-content">
+                        <div class="stat-number">5次</div>
+                        <div class="stat-label">本周训练次数</div>
+                        <div class="stat-trend">
+                            <i class="el-icon-top" style="color: #67C23A;"></i>
+                            <span style="color: #67C23A;">2次</span>
+                        </div>
+                    </div>
+                </div>
+            </el-col>
+
+            <el-col :span="6">
+                <div class="stat-card">
+                    <div class="stat-icon" style="color: #67C23A;">
+                        <i class="el-icon-timer"></i>
+                    </div>
+                    <div class="stat-content">
+                        <div class="stat-number">8.5小时</div>
+                        <div class="stat-label">累计训练时长</div>
+                        <div class="stat-trend">
+                            <i class="el-icon-top" style="color: #67C23A;"></i>
+                            <span style="color: #67C23A;">1.2小时</span>
+                        </div>
+                    </div>
+                </div>
+            </el-col>
+
+            <el-col :span="6">
+                <div class="stat-card">
+                    <div class="stat-icon" style="color: #E6A23C;">
+                        <i class="el-icon-fire"></i>
+                    </div>
+                    <div class="stat-content">
+                        <div class="stat-number">3,200千卡</div>
+                        <div class="stat-label">消耗热量</div>
+                        <div class="stat-trend">
+                            <i class="el-icon-top" style="color: #67C23A;"></i>
+                            <span style="color: #67C23A;">450千卡</span>
+                        </div>
+                    </div>
+                </div>
+            </el-col>
+
+            <el-col :span="6">
+                <div class="stat-card">
+                    <div class="stat-icon" style="color: #F56C6C;">
+                        <i class="el-icon-medal"></i>
+                    </div>
+                    <div class="stat-content">
+                        <div class="stat-number">12次</div>
+                        <div class="stat-label">本月课程完成</div>
+                        <div class="stat-trend">
+                            <i class="el-icon-top" style="color: #67C23A;"></i>
+                            <span style="color: #67C23A;">3次</span>
+                        </div>
+                    </div>
+                </div>
+            </el-col>
+        </el-row>
+    </el-card>
+
+    <!-- 今日课程表 -->
+    <el-card class="section-card" shadow="never">
+        <div slot="header" class="section-header">
+            <span class="section-title">
+                <i class="el-icon-date"></i>
+                今日课程表
+            </span>
+            <span class="section-subtitle">{{currentDate}} 可预约课程</span>
+        </div>
+
+        <el-table :data="courseData" style="width: 100%">
+            <el-table-column prop="time" label="时间" width="150"></el-table-column>
+            <el-table-column prop="name" label="课程名称"></el-table-column>
+            <el-table-column prop="coach" label="教练"></el-table-column>
+            <el-table-column prop="room" label="教室"></el-table-column>
+            <el-table-column label="操作" width="100">
+                <template slot-scope="scope">
+                    <el-button type="success" size="mini" @click="goToPage('reserve_course')">
+                        预约
+                    </el-button>
+                </template>
+            </el-table-column>
+        </el-table>
+    </el-card>
+
+    <!-- 热门器材 -->
+    <el-card class="section-card" shadow="never">
+        <div slot="header" class="section-header">
+            <span class="section-title">
+                <i class="el-icon-star-off"></i>
+                热门器材推荐
+            </span>
+            <span class="section-subtitle">当前空闲率较高的器材</span>
+        </div>
+
+        <el-row :gutter="20">
+            <el-col :span="6" v-for="equipment in equipmentList" :key="equipment.name">
+                <el-card class="equipment-card" shadow="hover">
+                    <div class="eq-icon" :style="{color: equipment.color}">
+                        <i :class="equipment.icon"></i>
+                    </div>
+                    <div class="eq-name">{{equipment.name}}</div>
+                    <div class="eq-status">
+                        <el-tag size="small" type="success">{{equipment.available}}</el-tag>
+                        <el-tag size="small" type="info">{{equipment.total}}</el-tag>
+                    </div>
+                    <el-button type="warning" size="small" style="width: 100%; margin-top: 15px;"
+                               @click="goToPage('reserve_equipment')">
+                        立即预约
+                    </el-button>
+                </el-card>
+            </el-col>
+        </el-row>
+    </el-card>
+
+    <!-- 健身小贴士 -->
+    <el-card class="section-card" shadow="never">
+        <div slot="header" class="section-header">
+            <span class="section-title">
+                <i class="el-icon-light-rain"></i>
+                今日健身小贴士
+            </span>
+        </div>
+
+        <el-collapse v-model="activeTips">
+            <el-collapse-item title="运动小贴士" name="1">
+                <div class="tips-content">
+                    <el-alert v-for="(tip, index) in fitnessTips"
+                              :key="index"
+                              :title="tip"
+                              type="info"
+                              :closable="false"
+                              show-icon
+                              style="margin-bottom: 10px;">
+                    </el-alert>
+                </div>
+            </el-collapse-item>
+        </el-collapse>
+    </el-card>
+</div>
+
+<script>
+    // 用户首页的专属JavaScript
+    new Vue({
+        el: '#content-area',
+        data() {
+            return {
+                currentDate: '',
+                courseData: [
+                    { time: '09:00-10:00', name: '晨间瑜伽', coach: '王老师', room: 'A区瑜伽室' },
+                    { time: '14:00-15:00', name: '力量训练', coach: '张教练', room: 'B区力量区' },
+                    { time: '19:00-20:00', name: '有氧健身操', coach: '李教练', room: 'C区多功能厅' },
+                    { time: '20:00-21:00', name: '动感单车', coach: '赵教练', room: 'D区单车室' }
+                ],
+                equipmentList: [
+                    { name: '跑步机', icon: 'el-icon-trophy', color: '#409EFF', available: '空闲：3台', total: '总数：10台' },
+                    { name: '动感单车', icon: 'el-icon-bicycle', color: '#67C23A', available: '空闲：5台', total: '总数：15台' },
+                    { name: '哑铃组', icon: 'el-icon-heavy-rain', color: '#E6A23C', available: '空闲：8套', total: '总数：12套' },
+                    { name: '综合训练器', icon: 'el-icon-set-up', color: '#F56C6C', available: '空闲：2台', total: '总数：5台' }
+                ],
+                fitnessTips: [
+                    '运动前要充分热身，避免运动损伤',
+                    '运动后及时补充水分和蛋白质',
+                    '保持每周3-5次的规律训练频率',
+                    '力量训练后需要足够的休息恢复时间',
+                    '合理安排有氧和无氧训练的比例'
+                ],
+                activeTips: ['1']
+            };
+        },
+        mounted() {
+            console.log('用户首页已加载');
+            this.currentDate = this.formatDate(new Date());
+        },
+        computed: {
+            currentUser() {
+                return app ? app.currentUser : {};
+            }
+        },
+        methods: {
+            formatDate(date) {
+                const year = date.getFullYear();
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const day = String(date.getDate()).padStart(2, '0');
+                const weekdays = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'];
+                const weekday = weekdays[date.getDay()];
+                return `${year}年${month}月${day}日 ${weekday}`;
+            },
+
+            formatUserId(userId) {
+                if (userId) {
+                    return userId.toString().padStart(6, '0');
+                }
+                return '000000';
+            },
+
+            getUserRoleText(role) {
+                const roleMap = {
+                    'vip': 'VIP会员',
+                    'member': '普通会员',
+                    'admin': '管理员'
+                };
+                return roleMap[role] || '会员';
+            },
+
+            goToPage(pageName) {
+                if (app && typeof app.loadContent === 'function') {
+                    app.loadContent(pageName);
+                }
+            }
+        }
+    });
+</script>

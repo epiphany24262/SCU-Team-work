@@ -1,0 +1,566 @@
+
+<link rel="stylesheet" href="css/member.css">
+
+<div>
+    <h1 class="page-title">用户管理</h1>
+
+    <!-- 搜索区域 -->
+    <div class="search-form">
+        <el-form :inline="true" :model="searchForm">
+            <el-form-item label="用户名">
+                <el-input v-model="searchForm.username" placeholder="请输入用户名"></el-input>
+            </el-form-item>
+            <el-form-item label="电话号码">
+                <el-input v-model="searchForm.phone" placeholder="请输入电话号码"></el-input>
+            </el-form-item>
+            <el-form-item>
+                <el-button type="primary" @click="handleSearch">搜索</el-button>
+                <el-button @click="handleReset">重置</el-button>
+                <el-button type="success" @click="handleAdd" icon="el-icon-plus">新增</el-button>
+            </el-form-item>
+        </el-form>
+    </div>
+
+    <!-- 数据表格 -->
+    <div class="table-container">
+        <el-table :data="tableData" border v-loading="loading" style="width: 100%">
+            <el-table-column prop="id" label="用户ID" width="80"></el-table-column>
+            <el-table-column prop="username" label="用户名" width="120"></el-table-column>
+            <el-table-column prop="realName" label="真实姓名" width="100"></el-table-column>
+            <el-table-column prop="phone" label="电话号码" width="120"></el-table-column>
+            <el-table-column prop="birthDate" label="出生年月" width="120">
+                <template slot-scope="scope">
+                    {{ formatDate(scope.row.birthDate) }}
+                </template>
+            </el-table-column>
+            <el-table-column prop="cardTime" label="办卡时间" width="120">
+                <template slot-scope="scope">
+                    {{ formatDate(scope.row.cardTime) }}
+                </template>
+            </el-table-column>
+            <el-table-column prop="expireTime" label="到期时间" width="120">
+                <template slot-scope="scope">
+                    {{ formatDate(scope.row.expireTime) }}
+                </template>
+            </el-table-column>
+            <el-table-column prop="role" label="身份" width="100">
+                <template slot-scope="scope">
+                    <el-tag :type="getRoleType(scope.row.role)">
+                        {{ getRoleText(scope.row.role) }}
+                    </el-tag>
+                </template>
+            </el-table-column>
+            <el-table-column prop="status" label="状态" width="80">
+                <template slot-scope="scope">
+                    <el-tag :type="scope.row.status === 1 ? 'success' : 'danger'">
+                        {{ scope.row.status === 1 ? '正常' : '禁用' }}
+                    </el-tag>
+                </template>
+            </el-table-column>
+            <el-table-column label="操作" width="240" fixed="right">
+                <template slot-scope="scope">
+                    <el-button size="mini" type="info" style="margin: 0 4px;" @click="handleDetail(scope.row)">详情</el-button>
+                    <el-button size="mini" type="primary" style="margin: 0 4px;" @click="handleEdit(scope.row)">编辑</el-button>
+                    <el-button size="mini" type="danger" style="margin: 0 4px;" @click="handleDelete(scope.row)">删除</el-button>
+                </template>
+            </el-table-column>
+        </el-table>
+    </div>
+
+    <!-- 详情对话框 -->
+    <el-dialog title="用户详情" :visible.sync="detailDialogVisible" width="600px">
+        <el-descriptions :column="2" border>
+            <el-descriptions-item label="用户ID">{{ detailData.id }}</el-descriptions-item>
+            <el-descriptions-item label="用户名">{{ detailData.username }}</el-descriptions-item>
+            <el-descriptions-item label="真实姓名">{{ detailData.realName }}</el-descriptions-item>
+            <el-descriptions-item label="电话号码">{{ detailData.phone }}</el-descriptions-item>
+            <el-descriptions-item label="出生年月">{{ formatDate(detailData.birthDate) }}</el-descriptions-item>
+            <el-descriptions-item label="身份">{{ getRoleText(detailData.role) }}</el-descriptions-item>
+            <el-descriptions-item label="办卡时间">{{ formatDate(detailData.cardTime) }}</el-descriptions-item>
+            <el-descriptions-item label="到期时间">{{ formatDate(detailData.expireTime) }}</el-descriptions-item>
+            <el-descriptions-item label="状态">{{ detailData.status === 1 ? '正常' : '禁用' }}</el-descriptions-item>
+            <el-descriptions-item label="创建时间">{{ formatDate(detailData.createTime) }}</el-descriptions-item>
+            <el-descriptions-item label="更新时间">{{ formatDate(detailData.updateTime) }}</el-descriptions-item>
+        </el-descriptions>
+        <div slot="footer" class="dialog-footer">
+            <el-button @click="detailDialogVisible = false">关闭</el-button>
+        </div>
+    </el-dialog>
+    <!-- 编辑对话框 -->
+    <el-dialog title="编辑用户" :visible.sync="modifyDialogVisible" width="600px" @close="ModifyDialogClose">
+        <el-form :model="form" :rules="modifyRules" ref="form" label-width="100px">
+            <el-row :gutter="20">
+                <el-col :span="12">
+                    <el-form-item label="用户名" prop="username">
+                        <el-input v-model="form.username"></el-input>
+                    </el-form-item>
+                </el-col>
+                <el-col :span="12">
+                    <el-form-item label="密码" prop="password">
+                        <el-input v-model="form.password" type="password"
+                                  :placeholder="true ? '留空则不修改密码' : ''"></el-input>
+                    </el-form-item>
+                </el-col>
+            </el-row>
+
+            <el-row :gutter="20">
+                <el-col :span="12">
+                    <el-form-item label="真实姓名" prop="realName">
+                        <el-input v-model="form.realName"  :disabled="true"></el-input>
+                    </el-form-item>
+                </el-col>
+                <el-col :span="12">
+                    <el-form-item label="身份" prop="role">
+                        <el-select v-model="form.role" placeholder="请选择身份" style="width: 100%">
+                            <el-option label="管理员" value="admin"></el-option>
+                            <el-option label="VIP会员" value="vip"></el-option>
+                            <el-option label="普通会员" value="member"></el-option>
+                        </el-select>
+                    </el-form-item>
+                </el-col>
+            </el-row>
+
+            <el-row :gutter="20">
+                <el-col :span="12">
+                    <el-form-item label="电话号码" prop="phone">
+                        <el-input v-model="form.phone"></el-input>
+                    </el-form-item>
+                </el-col>
+                <el-col :span="12">
+                    <el-form-item label="出生年月" prop="birthDate">
+                        <el-date-picker v-model="form.birthDate" type="date"
+                                        value-format="yyyy-MM-dd" style="width: 100%"></el-date-picker>
+                    </el-form-item>
+                </el-col>
+            </el-row>
+
+            <el-row :gutter="20">
+                <el-col :span="12">
+                    <el-form-item label="办卡时间" prop="cardTime">
+                        <el-date-picker v-model="form.cardTime" type="date"
+                                        value-format="yyyy-MM-dd" style="width: 100%"></el-date-picker>
+                    </el-form-item>
+                </el-col>
+                <el-col :span="12">
+                    <el-form-item label="到期时间" prop="expireTime">
+                        <el-date-picker v-model="form.expireTime" type="date"
+                                        value-format="yyyy-MM-dd" style="width: 100%"></el-date-picker>
+                    </el-form-item>
+                </el-col>
+            </el-row>
+
+            <el-form-item label="状态" prop="status">
+                <el-radio-group v-model="form.status">
+                    <el-radio :label="1">正常</el-radio>
+                    <el-radio :label="0">禁用</el-radio>
+                </el-radio-group>
+            </el-form-item>
+        </el-form>
+
+        <div slot="footer" class="dialog-footer">
+            <el-button @click="modifyDialogVisible = false">取消</el-button>
+            <el-button type="primary" @click="modifySubmit" :loading="submitLoading">确定</el-button>
+        </div>
+    </el-dialog>
+    <!-- 新增对话框 -->
+    <el-dialog title="新增用户" :visible.sync="addDialogVisible" width="600px" @close="AddDialogClose">
+        <el-form
+                :model="addForm"
+                :rules="addRules"
+                ref="addForm"
+                label-width="100px"
+                label-position="right">
+            <el-form-item label="用户名" prop="username">
+                <el-input
+                        v-model="addForm.username"
+                        placeholder="请输入用户名"
+                        maxlength="20"
+                        show-word-limit>
+                </el-input>
+            </el-form-item>
+            <el-form-item label="密码" prop="password">
+                <el-input
+                        v-model="addForm.password"
+                        type="password"
+                        placeholder="请输入密码"
+                        show-password
+                        maxlength="20">
+                </el-input>
+            </el-form-item>
+            <el-form-item label="真实姓名" prop="realName">
+                <el-input
+                        v-model="addForm.realName"
+                        placeholder="请输入真实姓名"
+                        maxlength="10"
+                        show-word-limit>
+                </el-input>
+            </el-form-item>
+            <el-form-item label="手机号" prop="phone">
+                <el-input
+                        v-model="addForm.phone"
+                        placeholder="请输入手机号"
+                        maxlength="11">
+                </el-input>
+            </el-form-item>
+            <el-form-item label="身份" prop="role">
+                <el-select
+                        v-model="addForm.role"
+                        placeholder="请选择身份"
+                        style="width: 100%"
+                        clearable>
+                    <el-option label="管理员" value="admin"></el-option>
+                    <el-option label="VIP会员" value="vip"></el-option>
+                    <el-option label="普通会员" value="member"></el-option>
+                </el-select>
+            </el-form-item>
+            <el-form-item label="状态" prop="status">
+                <el-radio-group v-model="addForm.status">
+                    <el-radio :label="1">正常</el-radio>
+                    <el-radio :label="0">禁用</el-radio>
+                </el-radio-group>
+            </el-form-item>
+        </el-form>
+
+        <div slot="footer" class="dialog-footer">
+            <el-button
+                    @click="addDialogVisible = false"
+                    :disabled="addLoading">
+                取消
+            </el-button>
+            <el-button
+                    type="primary"
+                    @click="handleAddSubmit"
+                    :loading="addLoading">
+                确定
+            </el-button>
+        </div>
+    </el-dialog>
+</div>
+
+<script>
+    new Vue({
+        el: '#content-area',
+        data() {
+            return {
+                // 搜索表单
+                searchForm: {
+                    username: '',
+                    phone: ''
+                },
+                // 表格数据
+                tableData: [],
+                loading: false,
+                submitLoading: false,
+
+                // 详情对话框
+                detailDialogVisible: false,
+                detailData: {},
+
+                // 新增对话框
+                addDialogVisible: false,
+                addLoading: false,
+                // 新增表单
+                addForm: {
+                    username: '',
+                    password: '',
+                    realName: '',
+                    phone: '',
+                    birthDate: '',
+                    cardTime: new Date().toISOString().split('T')[0],
+                    expireTime: this.getDefaultExpireTime(),
+                    role: 'member',
+                    status: 1
+                },
+                // 新增验证规则
+                addRules: {
+                    username: [
+                        { required: true, message: '请输入用户名', trigger: 'blur' }
+                    ],
+                    password: [
+                        { required: true, message: '请输入密码', trigger: 'blur' }
+                    ],
+                    realName: [
+                        { required: true, message: '请输入真实姓名', trigger: 'blur' }
+                    ],
+                    phone: [
+                        { required: true, message: '请输入电话号码', trigger: 'blur' }
+                    ],
+                    role: [
+                        { required: true, message: '请选择身份', trigger: 'blur' }
+                    ]
+                },
+
+                // 编辑对话框
+                modifyDialogVisible: false,
+                modifyLoading: false,
+                // 编辑表单
+                form: {
+                    id: null,
+                    username: '',
+                    password: '123456',
+                    realName: '',
+                    phone: '',
+                    birthDate: '',
+                    cardTime: new Date().toISOString().split('T')[0],
+                    expireTime: this.getDefaultExpireTime(),
+                    role: 'member',
+                    status: 1
+                },
+                // 编辑表单验证规则
+                modifyRules: {
+                    username: [
+                        { required: true, message: '请输入用户名', trigger: 'blur' },
+                        { min: 3, max: 50, message: '用户名长度在 3 到 50 个字符', trigger: 'blur' }
+                    ],
+                    realName: [
+                        { required: true, message: '请输入真实姓名', trigger: 'blur' }
+                    ],
+                    phone: [
+                        { required: true, message: '请输入电话号码', trigger: 'blur' },
+                        // { pattern: /^1[3-9]\d{9}$/, message: '请输入正确的手机号码', trigger: 'blur' }
+                    ],
+                    cardTime: [
+                        { required: false, message: '请选择办卡时间', trigger: 'change' }
+                    ],
+                    expireTime: [
+                        { required: false, message: '请选择到期时间', trigger: 'change' }
+                    ],
+                    role: [
+                        { required: true, message: '请选择身份', trigger: 'change' }
+                    ]
+                }
+            }
+        },
+        mounted() {
+            this.loadUserData();
+            // 监听用户信息更新事件
+            if (window.userUpdateEvent) {
+                window.userUpdateEvent.$on('userInfoUpdated', (userInfo) => {
+                    this.loadUserData();
+                    console.log('用户信息已实时更新');
+                });
+            }
+        },
+        methods: {
+            // 获取默认到期时间（办卡时间+6个月）
+            getDefaultExpireTime() {
+                const date = new Date();
+                date.setMonth(date.getMonth() + 6);
+                return date.toISOString().split('T')[0];
+            },
+            // 格式化日期
+            formatDate(date) {
+                if (!date) return '';
+                return new Date(date).toLocaleDateString();
+            },
+            // 获取角色显示文本
+            getRoleText(role) {
+                const roleMap = {
+                    'admin': '管理员',
+                    'vip': 'VIP会员',
+                    'member': '普通会员'
+                };
+                return roleMap[role] || role;
+            },
+            // 获取角色标签类型
+            getRoleType(role) {
+                const typeMap = {
+                    'admin': 'danger',
+                    'vip': 'warning',
+                    'member': 'success'
+                };
+                return typeMap[role] || 'info';
+            },
+            // 加载用户数据 - POST
+            loadUserData() {
+                this.loading = true;
+                axios.post('/api/users/list')
+                    .then(response => {
+                        this.tableData = response.data.data;
+                        this.loading = false;
+                    })
+                    .catch(error => {
+                        console.error('加载用户数据失败:', error);
+                        this.$message.error('加载数据失败');
+                        this.loading = false;
+                    });
+            },
+            // 搜索用户 - POST
+            handleSearch() {
+                this.loading = true;
+                axios.post('/api/users/list', this.searchForm)
+                    .then(response => {
+                        this.tableData = response.data.data;
+                        this.loading = false;
+                        this.$message.success('搜索完成');
+                    })
+                    .catch(error => {
+                        console.error('搜索失败:', error);
+                        this.$message.error('搜索失败');
+                        this.loading = false;
+                    });
+            },
+            // 重置搜索
+            handleReset() {
+                this.searchForm = {
+                    username: '',
+                    phone: ''
+                };
+                this.loadUserData();
+            },
+            // 查看详情
+            handleDetail(row) {
+                this.detailDialogVisible = true;
+                this.detailData = { ...row };
+            },
+            // 删除用户 - POST
+            handleDelete(row) {
+                this.$confirm(`确定删除用户 "${row.realName}" 吗？`, '提示', {
+                    type: 'warning',
+                    confirmButtonText: '确定',
+                    cancelButtonText: '取消'
+                }).then(() => {
+                    axios.post('/api/users/delete', { id: row.id })
+                        .then(response => {
+                            if (response.data.success) {
+                                this.$message.success('删除成功');
+                                this.loadUserData();
+                            } else {
+                                this.$message.error(response.data.message);
+                            }
+                        })
+                        .catch(error => {
+                            console.error('删除失败:', error);
+                            if (error.response && error.response.data && error.response.data.message) {
+                                this.$message.error(error.response.data.message);
+                            } else {
+                                this.$message.error('删除失败');
+                            }
+                        });
+                });
+            },
+
+            // 新增用户表单填充
+            handleAdd() {
+                this.addDialogVisible = true;
+                this.$nextTick(() => {
+                    this.addForm = {
+                        username: '',
+                        password: '',
+                        realName: '',
+                        phone: '',
+                        birthDate: '',
+                        cardTime: new Date().toISOString().split('T')[0],
+                        expireTime: this.getDefaultExpireTime(),
+                        role: 'member',
+                        status: 1
+                    };
+                    if (this.$refs.addForm) {
+                        this.$refs.addForm.clearValidate();
+                    }
+                });
+            },
+            // 新增对话框关闭
+            AddDialogClose(){
+                this.$refs.addForm.clearValidate();
+            },
+            // 提交新增
+            handleAddSubmit() {
+                this.$refs.addForm.validate((valid) => {
+                    if (valid) {
+                        this.addLoading = true;
+                        axios.post('/api/users/add', this.addForm)
+                            .then(response => {
+                                if (response.data.success) {
+                                    this.$message.success('新增成功');
+                                    this.addDialogVisible = false;
+                                    this.loadUserData();
+                                } else {
+                                    this.$message.error(response.data.message);
+                                }
+                            })
+                            .catch(error => {
+                                this.$message.error('新增失败');
+                            })
+                            .finally(() => {
+                                this.addLoading = false;
+                            });
+                    }
+                });
+            },
+
+            // 编辑用户表单填充
+            handleEdit(row) {
+                this.modifyDialogVisible = true;
+                // 填充表单数据（深拷贝）
+                this.$nextTick(() => {
+                    this.form = {
+                        id: row.id,
+                        username: row.username,
+                        password: '', // 编辑时不显示密码
+                        realName: row.realName,
+                        phone: row.phone,
+                        birthDate: row.birthDate ? new Date(row.birthDate).toISOString().split('T')[0] : '',
+                        cardTime: row.cardTime ? new Date(row.cardTime).toISOString().split('T')[0] : '',
+                        expireTime: row.expireTime ? new Date(row.expireTime).toISOString().split('T')[0] : '',
+                        role: row.role,
+                        status: row.status
+                    };
+                });
+            },
+            // 编辑对话框关闭
+            ModifyDialogClose() {
+                this.$refs.form.clearValidate();
+            },
+            // 提交编辑
+            modifySubmit() {
+                this.$refs.form.validate((valid) => {
+                    if (valid) {
+                        this.submitLoading = true;
+                        // 处理表单数据
+                        const submitData = { ...this.form };
+
+                        // 编辑时密码为空则不更新密码
+                        if (!submitData.password) {
+                            delete submitData.password;
+                        }
+
+                        axios.post('/api/users/update', submitData)
+                            .then(response => {
+                                if (response.data.success) {
+                                    this.$message.success(response.data.message);
+                                    this.modifyDialogVisible = false;
+                                    // 直接使用后端返回的最新数据
+                                    const latestUserInfo = response.data.data;
+                                    // 从主应用获取当前用户ID
+                                    const currentUserId = app&&app.currentUser?app.currentUser.id:null;
+                                    // 判断是否是修改自己的信息
+                                    if (currentUserId && latestUserInfo.id === currentUserId) {
+                                        // 修改自己：触发全局更新
+                                        if (app && app.updateUserInfo) {
+                                            app.updateUserInfo(latestUserInfo);
+                                        }
+                                    } else {
+                                        // 修改别人：只刷新表格
+                                        this.loadUserData();
+                                    }
+                                } else {
+                                    this.$message.error(response.data.message);
+                                }
+                                this.submitLoading = false;
+                            })
+                            .catch(error => {
+                                console.error('操作失败:', error);
+                                if (error.response && error.response.data && error.response.data.message) {
+                                    this.$message.error(error.response.data.message);
+                                } else {
+                                    this.$message.error('操作失败');
+                                }
+                                this.submitLoading = false;
+                            });
+                    }
+                });
+            }
+        }
+    });
+</script>

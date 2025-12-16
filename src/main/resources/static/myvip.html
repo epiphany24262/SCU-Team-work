@@ -1,0 +1,459 @@
+<link rel="stylesheet" href="css/myvip.css">
+
+<div class="myvip-container">
+    <el-card class="main-card" shadow="never">
+        <div slot="header" class="card-header">
+            <span class="title">
+                <i class="el-icon-s-flag"></i>
+                我的会员卡
+            </span>
+            <el-tag v-if="currentUser.role === 'vip'" type="warning" size="medium">VIP会员</el-tag>
+            <el-tag v-else type="info" size="medium">普通会员</el-tag>
+        </div>
+
+        <el-row :gutter="20">
+            <!-- VIP状态展示 -->
+            <el-col :span="12">
+                <div class="vip-status-section">
+                    <h3 class="section-title">会员卡状态</h3>
+
+                    <div class="vip-card" :class="{ 'vip-active': isVIP, 'vip-inactive': !isVIP }">
+                        <div class="vip-card-header">
+                            <i class="el-icon-star-on"></i>
+                            <span class="vip-level">{{vipStatusText}}</span>
+                        </div>
+                        <div class="vip-card-content">
+                            <div class="vip-benefits">
+                                <h4>VIP特权</h4>
+                                <ul>
+                                    <li><i class="el-icon-check"></i> 优先预约热门课程</li>
+                                    <li><i class="el-icon-check"></i> 免费使用VIP专属区域</li>
+                                    <li><i class="el-icon-check"></i> 专业私教指导（每月2次）</li>
+                                    <li><i class="el-icon-check"></i> 器材预约优先权</li>
+                                    <li><i class="el-icon-check"></i> 健身营养咨询服务</li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="vip-card-footer">
+                            <div class="status-indicator">
+                                <i :class="isVIP ? 'el-icon-success' : 'el-icon-warning'"></i>
+                                <span>{{vipStatus}}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 会员信息 -->
+                    <div class="vip-info-section">
+                        <h3 class="section-title">会员信息</h3>
+                        <el-descriptions :column="1" border>
+                            <el-descriptions-item label="会员卡号">
+                                <el-tag type="primary">VIP-{{formatUserId(currentUser.id)}}</el-tag>
+                            </el-descriptions-item>
+                            <el-descriptions-item label="会员姓名">{{currentUser.realName || '会员'}}</el-descriptions-item>
+                            <el-descriptions-item label="手机号码">{{currentUser.phone || '未设置'}}</el-descriptions-item>
+                            <el-descriptions-item label="会员状态">
+                                <el-tag :type="vipTagType">{{vipStatusText}}</el-tag>
+                            </el-descriptions-item>
+                            <el-descriptions-item label="健身卡到期">
+                                {{formatDate(currentUser.expireTime) || '未设置'}}
+                            </el-descriptions-item>
+                        </el-descriptions>
+                    </div>
+                </div>
+            </el-col>
+
+            <!-- VIP开通/充值 -->
+            <el-col :span="12">
+                <div class="vip-action-section">
+                    <h3 class="section-title">{{isVIP ? '会员卡续费' : '开通VIP会员'}}</h3>
+
+                    <div class="vip-plans">
+                        <el-radio-group v-model="selectedPlan" @change="calculateVipPrice">
+                            <div class="plan-card" v-for="plan in vipPlans" :key="plan.id">
+                                <el-radio :label="plan.id">
+                                    <div class="plan-content">
+                                        <div class="plan-header">
+                                            <div class="plan-name">{{plan.name}}</div>
+                                            <div class="plan-price">¥{{plan.price}}</div>
+                                        </div>
+                                        <div class="plan-duration">{{plan.duration}}</div>
+                                        <div class="plan-features">
+                                            <div v-for="feature in plan.features" :key="feature"
+                                                 class="feature-item">
+                                                <i class="el-icon-check"></i>{{feature}}
+                                            </div>
+                                        </div>
+                                        <div class="plan-save" v-if="plan.save">
+                                            节省 ¥{{plan.save}}
+                                        </div>
+                                    </div>
+                                </el-radio>
+                            </div>
+                        </el-radio-group>
+                    </div>
+
+                    <!-- 支付信息汇总 -->
+                    <div class="payment-summary">
+                        <el-descriptions :column="1" border>
+                            <el-descriptions-item label="选择套餐">{{selectedPlanName}}</el-descriptions-item>
+                            <el-descriptions-item label="套餐价格">¥{{vipPrice}}</el-descriptions-item>
+                            <el-descriptions-item label="有效期">{{vipDuration}}</el-descriptions-item>
+                            <el-descriptions-item label="总金额">
+                                <span class="total-amount">¥{{vipPrice}}</span>
+                            </el-descriptions-item>
+                        </el-descriptions>
+
+                        <!-- 开通/续费按钮 -->
+                        <el-button
+                                :type="isVIP ? 'warning' : 'success'"
+                                size="large"
+                                style="width: 100%; margin-top: 20px;"
+                                @click="handleVipPayment"
+                                :disabled="isVIP">
+                            <i class="el-icon-wallet"></i>
+                            {{isVIP ? '已是VIP会员' : '立即开通'}} VIP会员
+                        </el-button>
+
+                        <!-- VIP协议 -->
+                        <div class="vip-agreement">
+                            <el-checkbox v-model="agreeTerms">
+                                我已阅读并同意《VIP会员服务协议》
+                            </el-checkbox>
+                            <a href="javascript:void(0)" @click="viewAgreement">查看协议</a>
+                        </div>
+                    </div>
+                </div>
+            </el-col>
+        </el-row>
+
+        <!-- VIP消费记录 -->
+        <div class="vip-record-section">
+            <h3 class="section-title">会员记录</h3>
+            <el-tabs v-model="activeRecordTab">
+                <el-tab-pane label="开通记录" name="activation">
+                    <el-table :data="activationRecords" style="width: 100%">
+                        <el-table-column prop="date" label="开通时间" width="180"></el-table-column>
+                        <el-table-column prop="plan" label="套餐类型"></el-table-column>
+                        <el-table-column prop="price" label="支付金额"></el-table-column>
+                        <el-table-column prop="expireDate" label="到期时间" width="180"></el-table-column>
+                        <el-table-column label="状态" width="100">
+                            <template slot-scope="scope">
+                                <el-tag :type="scope.row.status === '有效' ? 'success' : 'info'">
+                                    {{scope.row.status}}
+                                </el-tag>
+                            </template>
+                        </el-table-column>
+                    </el-table>
+                </el-tab-pane>
+                <el-tab-pane label="消费记录" name="consumption">
+                    <el-table :data="consumptionRecords" style="width: 100%">
+                        <el-table-column prop="date" label="消费时间" width="180"></el-table-column>
+                        <el-table-column prop="type" label="消费类型"></el-table-column>
+                        <el-table-column prop="amount" label="金额"></el-table-column>
+                        <el-table-column prop="paymentMethod" label="支付方式"></el-table-column>
+                    </el-table>
+                </el-tab-pane>
+            </el-tabs>
+        </div>
+    </el-card>
+
+    <!-- VIP支付弹窗 -->
+    <el-dialog :title="isVIP ? 'VIP续费支付' : '开通VIP支付'"
+               :visible.sync="paymentDialogVisible"
+               width="500px"
+               @close="resetPaymentDialog">
+        <div class="payment-dialog">
+            <!-- 支付信息 -->
+            <div class="payment-info-section">
+                <h3>支付信息</h3>
+                <el-descriptions :column="1" size="medium">
+                    <el-descriptions-item label="会员套餐">{{selectedPlanName}}</el-descriptions-item>
+                    <el-descriptions-item label="支付金额">¥{{vipPrice}}</el-descriptions-item>
+                    <el-descriptions-item label="有效期">{{vipDuration}}</el-descriptions-item>
+                    <el-descriptions-item label="会员特权">{{vipFeatures}}</el-descriptions-item>
+                </el-descriptions>
+            </div>
+
+            <!-- 支付方式选择 -->
+            <div class="payment-method-section">
+                <h3>选择支付方式</h3>
+                <el-radio-group v-model="paymentMethod" @change="updateQRCode">
+                    <div class="payment-method-option">
+                        <el-radio label="alipay">
+                            <div class="payment-method-content">
+                                <i class="el-icon-s-finance"></i>
+                                <span>支付宝支付</span>
+                            </div>
+                        </el-radio>
+                    </div>
+                    <div class="payment-method-option">
+                        <el-radio label="wechat">
+                            <div class="payment-method-content">
+                                <i class="el-icon-s-promotion"></i>
+                                <span>微信支付</span>
+                            </div>
+                        </el-radio>
+                    </div>
+                </el-radio-group>
+            </div>
+
+            <!-- 二维码展示 -->
+            <div class="qrcode-section" v-show="paymentMethod">
+                <h3>请扫描二维码支付</h3>
+                <div class="qrcode-container">
+                    <img :src="currentQRCode" alt="支付二维码" class="qrcode-image">
+                </div>
+                <p class="qrcode-hint">请使用{{paymentMethod === 'alipay' ? '支付宝' : '微信'}}扫码支付</p>
+            </div>
+
+            <!-- 操作按钮 -->
+            <div class="payment-actions">
+                <el-button @click="cancelPayment" size="medium">取消</el-button>
+                <el-button type="primary" @click="confirmVipPayment" size="medium" :loading="paymentLoading">
+                    我已付款
+                </el-button>
+            </div>
+        </div>
+    </el-dialog>
+</div>
+
+<script>
+    new Vue({
+        el: '#content-area',
+        data() {
+            return {
+                selectedPlan: 'monthly',
+                vipPrice: 199,
+                paymentMethod: 'alipay',
+                agreeTerms: false,
+                activeRecordTab: 'activation',
+                paymentDialogVisible: false,
+                paymentLoading: false,
+                currentQRCode: 'images/alipay.jpg',
+                qrCodes: {
+                    alipay: 'images/alipay.jpg',
+                    wechat: 'images/wechat.jpg'
+                },
+                vipPlans: [
+                    {
+                        id: 'monthly',
+                        name: '月度VIP',
+                        price: 199,
+                        duration: '1个月',
+                        features: ['所有VIP特权', '每月2次私教指导', '营养咨询服务'],
+                        save: 0
+                    },
+                    {
+                        id: 'quarterly',
+                        name: '季度VIP',
+                        price: 499,
+                        duration: '3个月',
+                        features: ['所有VIP特权', '每月4次私教指导', '专业体测分析'],
+                        save: 98
+                    },
+                    {
+                        id: 'yearly',
+                        name: '年度VIP',
+                        price: 1899,
+                        duration: '1年',
+                        features: ['所有VIP特权', '每月6次私教指导', '全年健康管理'],
+                        save: 489
+                    }
+                ],
+                activationRecords: [
+                    { date: '2025-11-01 10:30', plan: '月度VIP', price: '199', expireDate: '2025-12-01', status: '已过期' }
+                ],
+                consumptionRecords: []
+            };
+        },
+        computed: {
+            currentUser() {
+                return app ? app.currentUser : {};
+            },
+            isVIP() {
+                return this.currentUser.role === 'vip';
+            },
+            vipStatus() {
+                return this.isVIP ? '已开通' : '未开通';
+            },
+            vipStatusText() {
+                return this.isVIP ? 'VIP会员' : '普通会员';
+            },
+            vipTagType() {
+                return this.isVIP ? 'warning' : 'info';
+            },
+            selectedPlanName() {
+                const plan = this.vipPlans.find(p => p.id === this.selectedPlan);
+                return plan ? plan.name : '';
+            },
+            vipDuration() {
+                const plan = this.vipPlans.find(p => p.id === this.selectedPlan);
+                return plan ? plan.duration : '';
+            },
+            vipFeatures() {
+                const plan = this.vipPlans.find(p => p.id === this.selectedPlan);
+                return plan ? plan.features.join('、') : '';
+            }
+        },
+        mounted() {
+            this.calculateVipPrice();
+        },
+        methods: {
+            formatUserId(userId) {
+                if (userId) {
+                    return userId.toString().padStart(6, '0');
+                }
+                return '000000';
+            },
+
+            formatDate(dateStr) {
+                if (!dateStr) return '';
+                const date = new Date(dateStr);
+                return date.toLocaleDateString();
+            },
+
+            calculateVipPrice() {
+                const plan = this.vipPlans.find(p => p.id === this.selectedPlan);
+                this.vipPrice = plan ? plan.price : 199;
+            },
+
+            handleVipPayment() {
+                if (this.isVIP) {
+                    this.$message.info('您已经是VIP会员');
+                    return;
+                }
+
+                if (!this.agreeTerms) {
+                    this.$message.warning('请先阅读并同意会员服务协议');
+                    return;
+                }
+
+                this.paymentDialogVisible = true;
+                this.paymentMethod = 'alipay';
+                this.currentQRCode = this.qrCodes.alipay;
+            },
+
+            updateQRCode() {
+                this.currentQRCode = this.qrCodes[this.paymentMethod];
+            },
+
+            cancelPayment() {
+                this.paymentDialogVisible = false;
+                this.$message.info('已取消支付');
+            },
+
+            async confirmVipPayment() {
+                this.paymentLoading = true;
+
+                try {
+                    // 调用后端API开通VIP
+                    const response = await axios.post('/api/cardAndVip/upgradeToVip', {
+                        userId: this.currentUser.id
+                    });
+
+                    if (response.data && response.data.success) {
+                        // 获取后端返回的更新后的用户信息
+                        const updatedUserData = response.data.data.user || {};
+
+                        // 创建一个完整的用户对象，保留原有字段
+                        const fullUpdatedUser = {
+                            // 保持原有的所有字段
+                            ...this.currentUser,
+                            // 覆盖需要更新的字段
+                            role: 'vip',  // 确保角色改为vip
+                            updateTime: new Date().toISOString(),
+                            // 如果后端返回了其他更新字段，也覆盖
+                            ...updatedUserData
+                        };
+
+                        // 更新本地用户信息
+                        if (app && app.updateUserInfo) {
+                            app.updateUserInfo(fullUpdatedUser);
+                        }
+
+                        // 同时更新localStorage
+                        try {
+                            localStorage.setItem('userInfo', JSON.stringify(fullUpdatedUser));
+                        } catch (e) {
+                            console.error('更新localStorage失败:', e);
+                        }
+
+                        this.$message.success('开通VIP成功！');
+                        this.paymentDialogVisible = false;
+
+                        // 添加开通记录
+                        this.addActivationRecord();
+                    } else {
+                        this.$message.error(response.data.message || '开通失败');
+                    }
+                } catch (error) {
+                    console.error('开通VIP失败:', error);
+                    this.$message.error('开通失败，请稍后重试');
+                } finally {
+                    this.paymentLoading = false;
+                }
+            },
+
+            addActivationRecord() {
+                const plan = this.vipPlans.find(p => p.id === this.selectedPlan);
+                const newRecord = {
+                    date: new Date().toLocaleString(),
+                    plan: plan.name,
+                    price: plan.price,
+                    expireDate: this.calculateVipExpireDate(),
+                    status: '有效'
+                };
+                this.activationRecords.unshift(newRecord);
+
+                // 添加消费记录
+                const consumptionRecord = {
+                    date: new Date().toLocaleString(),
+                    type: '开通VIP',
+                    amount: plan.price,
+                    paymentMethod: this.paymentMethod === 'alipay' ? '支付宝' : '微信'
+                };
+                this.consumptionRecords.unshift(consumptionRecord);
+            },
+
+            calculateVipExpireDate() {
+                const plan = this.vipPlans.find(p => p.id === this.selectedPlan);
+                if (!plan) return '';
+
+                const expireDate = new Date();
+                if (plan.duration.includes('月')) {
+                    const months = parseInt(plan.duration);
+                    expireDate.setMonth(expireDate.getMonth() + months);
+                } else if (plan.duration.includes('年')) {
+                    const years = parseInt(plan.duration);
+                    expireDate.setFullYear(expireDate.getFullYear() + years);
+                } else if (plan.duration.includes('季')) {
+                    expireDate.setMonth(expireDate.getMonth() + 3);
+                }
+
+                return expireDate.toLocaleDateString();
+            },
+
+            resetPaymentDialog() {
+                this.paymentLoading = false;
+                this.paymentMethod = 'alipay';
+                this.currentQRCode = this.qrCodes.alipay;
+            },
+
+            viewAgreement() {
+                // 查看协议
+                this.$alert(`
+                    <h3>VIP会员服务协议</h3>
+                    <p>1. VIP会员享有优先预约课程和器材的特权。</p>
+                    <p>2. VIP会员可免费使用VIP专属健身区域。</p>
+                    <p>3. VIP会员每月可享受2次专业私教指导服务。</p>
+                    <p>4. VIP会员享有健身营养咨询服务。</p>
+                    <p>5. 会员服务期限按购买套餐时间计算。</p>
+                    <p>6. 本协议最终解释权归健身房所有。</p>
+                `, 'VIP会员服务协议', {
+                    confirmButtonText: '我已阅读',
+                    dangerouslyUseHTMLString: true
+                });
+            }
+        }
+    });
+</script>

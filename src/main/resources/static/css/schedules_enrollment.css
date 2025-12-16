@@ -1,0 +1,231 @@
+
+.enrollment-management {
+    padding: 20px;
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+    min-height: 600px;
+}
+
+.enrollment-management .toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding: 15px;
+    background: #f8f9fa;
+    border-radius: 6px;
+    border-left: 4px solid #409EFF;
+}
+
+.enrollment-management .search-box {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+}
+
+.enrollment-management .table-container {
+    margin-bottom: 20px;
+    border: 1px solid #ebeef5;
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+.enrollment-management .action-buttons {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.enrollment-management .action-buttons .el-button {
+    margin: 2px;
+}
+
+.enrollment-management .pagination {
+    display: flex;
+    justify-content: center;
+    padding: 15px;
+    background: #f8f9fa;
+    border-radius: 6px;
+}
+
+/* 表格样式优化 */
+.enrollment-management .el-table {
+    border: 1px solid #ebeef5;
+    border-radius: 6px;
+}
+
+.enrollment-management .el-table th {
+    background-color: #f5f7fa;
+    color: #606266;
+    font-weight: 600;
+}
+
+.enrollment-management .el-table td {
+    padding: 12px 0;
+}
+
+.enrollment-management .el-table .cell {
+    padding: 0 12px;
+    line-height: 1.4;
+}
+
+/* 状态标签样式 */
+.enrollment-management .el-tag {
+    border-radius: 12px;
+    font-weight: 500;
+}
+
+.enrollment-management .el-tag--success {
+    background-color: #f0f9ff;
+    border-color: #409EFF;
+    color: #409EFF;
+}
+
+.enrollment-management .el-tag--warning {
+    background-color: #fdf6ec;
+    border-color: #e6a23c;
+    color: #e6a23c;
+}
+
+/* 按钮样式优化 */
+.enrollment-management .el-button {
+    border-radius: 4px;
+    font-weight: 500;
+}
+
+.enrollment-management .el-button--primary {
+    background: linear-gradient(135deg, #409EFF, #66b1ff);
+    border: none;
+}
+
+.enrollment-management .el-button--success {
+    background: linear-gradient(135deg, #67c23a, #85ce61);
+    border: none;
+}
+
+.enrollment-management .el-button--warning {
+    background: linear-gradient(135deg, #e6a23c, #ebb563);
+    border: none;
+}
+
+.enrollment-management .el-button--danger {
+    background: linear-gradient(135deg, #f56c6c, #f78989);
+    border: none;
+}
+
+.enrollment-management .el-button:not(.is-disabled):hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    transition: all 0.3s ease;
+}
+
+/* 搜索框样式 */
+.enrollment-management .el-input__inner {
+    border-radius: 4px;
+    border: 1px solid #dcdfe6;
+}
+
+.enrollment-management .el-input-group__append {
+    background: linear-gradient(135deg, #409EFF, #66b1ff);
+    border: none;
+    color: white;
+}
+
+.enrollment-management .el-input-group__append .el-button {
+    background: transparent;
+    border: none;
+    color: white;
+}
+
+/* 选择框样式 */
+.enrollment-management .el-select .el-input__inner {
+    border-radius: 4px;
+}
+
+/* 分页样式 */
+.enrollment-management .el-pagination {
+    padding: 0;
+}
+
+.enrollment-management .el-pagination.is-background .btn-prev,
+.enrollment-management .el-pagination.is-background .btn-next,
+.enrollment-management .el-pagination.is-background .el-pager li {
+    border-radius: 4px;
+    margin: 0 4px;
+}
+
+.enrollment-management .el-pagination.is-background .el-pager li:not(.disabled).active {
+    background: linear-gradient(135deg, #409EFF, #66b1ff);
+}
+
+/* 加载状态 */
+.enrollment-management .el-loading-mask {
+    border-radius: 6px;
+}
+
+/* 表格行悬停效果 */
+.enrollment-management .el-table--enable-row-hover .el-table__body tr:hover>td {
+    background-color: #f5f7fa;
+}
+
+/* 空状态样式 */
+.enrollment-management .el-table__empty-block {
+    padding: 40px 0;
+}
+
+.enrollment-management .el-table__empty-text {
+    color: #909399;
+    font-size: 14px;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+    .enrollment-management .toolbar {
+        flex-direction: column;
+        gap: 15px;
+        align-items: stretch;
+    }
+
+    .enrollment-management .search-box {
+        flex-direction: column;
+    }
+
+    .enrollment-management .search-box .el-input,
+    .enrollment-management .search-box .el-select {
+        width: 100% !important;
+    }
+
+    .enrollment-management .action-buttons {
+        justify-content: center;
+    }
+}
+
+/* 选中行样式 */
+.enrollment-management .el-table__body tr.current-row>td {
+    background-color: #ecf5ff;
+}
+
+/* 表格边框优化 */
+.enrollment-management .el-table--border::after,
+.enrollment-management .el-table--group::after,
+.enrollment-management .el-table::before {
+    background-color: #ebeef5;
+}
+
+.enrollment-management .el-table--border {
+    border: 1px solid #ebeef5;
+    border-right: none;
+    border-bottom: none;
+}
+
+.enrollment-management .el-table--border td,
+.enrollment-management .el-table--border th,
+.enrollment-management .el-table__body-wrapper .el-table--border.is-scrolling-left~.el-table__fixed-right {
+    border-right: 1px solid #ebeef5;
+}
+
+.enrollment-management .el-table--border th,
+.enrollment-management .el-table__fixed-right-patch {
+    border-bottom: 1px solid #ebeef5;
+}

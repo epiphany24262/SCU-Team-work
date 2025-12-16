@@ -1,0 +1,500 @@
+<link rel="stylesheet" href="css/reserve_course.css">
+
+<div class="course-enrollment">
+    <!-- 选项卡切换 -->
+    <div class="tab-container">
+        <el-tabs v-model="activeTab" @tab-click="handleTabClick">
+            <el-tab-pane label="课程报名" name="enroll">
+                <!-- 课程报名部分 -->
+                <div class="enrollment-section">
+                    <!-- 工具栏 -->
+                    <div class="toolbar">
+                        <div class="search-box">
+                            <el-input
+                                    v-model="searchKeyword"
+                                    placeholder="搜索课程名称、教练"
+                                    clearable
+                                    @clear="handleSearch"
+                                    @keyup.enter="handleSearch"
+                                    style="width: 300px;"
+                            >
+                                <template #append>
+                                    <el-button @click="handleSearch" icon="el-icon-search"></el-button>
+                                </template>
+                            </el-input>
+
+                            <el-date-picker
+                                    v-model="scheduleDate"
+                                    type="date"
+                                    placeholder="选择日期查看课程"
+                                    @change="handleDateChange"
+                                    style="margin-left: 20px;"
+                            />
+                        </div>
+                    </div>
+
+                    <!-- 课程列表 -->
+                    <div class="course-list">
+                        <el-table
+                                :data="filteredCourses"
+                                empty-text="暂无课程"
+                                style="width: 100%"
+                                v-loading="loading">
+                            <el-table-column prop="courseTitle" label="课程名称" min-width="150"></el-table-column>
+                            <el-table-column prop="coachName" label="教练" width="120"></el-table-column>
+                            <el-table-column prop="roomName" label="教室" width="120"></el-table-column>
+                            <el-table-column label="上课时间" width="180">
+                                <template slot-scope="scope">
+                                    {{ formatDateTime(scope.row.startTime) }}
+                                </template>
+                            </el-table-column>
+                            <el-table-column label="容量" width="100">
+                                <template slot-scope="scope">
+                                    {{ scope.row.currentStudents }}/{{ scope.row.maxStudents }}
+                                </template>
+                            </el-table-column>
+                            <el-table-column label="状态" width="120">
+                                <template slot-scope="scope">
+                                    <el-tag
+                                            v-if="getEnrollmentStatus(scope.row.id) === 'enrolled'"
+                                            type="success"
+                                            size="small"
+                                    >已报名</el-tag>
+                                    <el-tag
+                                            v-else-if="getEnrollmentStatus(scope.row.id) === 'pending'"
+                                            type="warning"
+                                            size="small"
+                                    >审核中</el-tag>
+                                    <el-tag
+                                            v-else-if="scope.row.currentStudents >= scope.row.maxStudents"
+                                            type="danger"
+                                            size="small"
+                                    >已满</el-tag>
+                                    <el-tag
+                                            v-else
+                                            type="info"
+                                            size="small"
+                                    >可报名</el-tag>
+                                </template>
+                            </el-table-column>
+                            <el-table-column label="操作" width="150" fixed="right">
+                                <template slot-scope="scope">
+                                    <el-button
+                                            v-if="!getEnrollmentStatus(scope.row.id) && scope.row.currentStudents < scope.row.maxStudents"
+                                            size="mini"
+                                            type="primary"
+                                            @click="handleEnroll(scope.row)"
+                                            :loading="scope.row.enrolling"
+                                    >报名</el-button>
+                                    <el-button
+                                            v-else-if="getEnrollmentStatus(scope.row.id)"
+                                            size="mini"
+                                            type="danger"
+                                            @click="handleCancelEnroll(scope.row)"
+                                            :loading="scope.row.canceling"
+                                    >取消</el-button>
+                                    <el-button
+                                            v-else
+                                            size="mini"
+                                            type="info"
+                                            disabled
+                                    >已满</el-button>
+                                </template>
+                            </el-table-column>
+                        </el-table>
+                    </div>
+                </div>
+            </el-tab-pane>
+
+            <el-tab-pane label="我的课程表" name="mySchedule">
+                <!-- 我的课程表部分 -->
+                <div class="my-schedule-section">
+                    <!-- 工具栏 -->
+                    <div class="toolbar">
+                        <div class="week-navigation">
+                            <el-button @click="prevWeek" icon="el-icon-arrow-left" size="small"></el-button>
+                            <span class="current-week">{{ currentWeekRange }}</span>
+                            <el-button @click="nextWeek" icon="el-icon-arrow-right" size="small"></el-button>
+                            <el-button @click="goToday" type="text">今天</el-button>
+                        </div>
+                    </div>
+
+                    <!-- 课程表 -->
+                    <div class="timetable" v-loading="loading">
+                        <div class="timetable-header">
+                            <div class="time-column"></div>
+                            <div class="day-header" v-for="day in weekDays" :key="day.date">
+                                <div class="day-name">{{ day.name }}</div>
+                                <div class="day-date">{{ day.date }}</div>
+                            </div>
+                        </div>
+
+                        <div class="timetable-body">
+                            <div class="time-slots">
+                                <div class="time-slot" v-for="hour in timeSlots" :key="hour">
+                                    {{ hour }}:00
+                                </div>
+                            </div>
+
+                            <div class="schedule-grid">
+                                <div class="day-column" v-for="day in weekDays" :key="day.date">
+                                    <div class="hour-slot" v-for="hour in timeSlots" :key="hour"></div>
+
+                                    <!-- 只显示已报名且审核通过的课程 -->
+                                    <div class="course-card"
+                                         v-for="schedule in getMySchedulesByDay(day.name)"
+                                         :key="schedule.id"
+                                         :style="getCourseStyle(schedule)"
+                                         :class="`course-color-${schedule.colorType || (schedule.id % 6)}`">
+                                        <div class="course-content">
+                                            <div class="course-title">{{ schedule.courseTitle }}</div>
+                                            <div class="course-time">{{ formatTime(schedule.startTime) }}-{{ formatTime(schedule.endTime) }}</div>
+                                            <div class="course-info">
+                                                <span class="coach">{{ schedule.coachName }}</span>
+                                                <span class="room">{{ schedule.roomName }}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </el-tab-pane>
+        </el-tabs>
+    </div>
+</div>
+
+<script>
+    new Vue({
+        el: '.course-enrollment',
+        data() {
+            return {
+                activeTab: 'enroll',
+                loading: false,
+
+                // 课程报名相关数据
+                searchKeyword: '',
+                scheduleDate: null,
+                allCourses: [],
+
+                // 我的课程表相关数据
+                currentDate: new Date(),
+                timeSlots: [7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21],
+                weekDays: [],
+                mySchedules: {},
+
+                // 通用数据
+                myEnrollments: [],
+                currentUser: null,
+                currentUserId: null,
+            }
+        },
+        computed: {
+            // 筛选课程
+            filteredCourses() {
+                let courses = this.allCourses;
+
+                // 根据搜索关键词筛选
+                if (this.searchKeyword) {
+                    const keyword = this.searchKeyword.toLowerCase();
+                    courses = courses.filter(course =>
+                        course.courseTitle.toLowerCase().includes(keyword) ||
+                        course.coachName.toLowerCase().includes(keyword)
+                    );
+                }
+
+                // 根据日期筛选
+                if (this.scheduleDate) {
+                    const selectedDate = this.formatDate(this.scheduleDate, 'yyyy-MM-dd');
+                    courses = courses.filter(course =>
+                        this.formatDate(course.startTime, 'yyyy-MM-dd') === selectedDate
+                    );
+                }
+
+                return courses;
+            },
+
+            currentWeekRange() {
+                if (this.weekDays.length === 0) return '';
+                const start = this.weekDays[0].date;
+                const end = this.weekDays[6].date;
+                return `${start} - ${end}`;
+            }
+        },
+        mounted() {
+            this.loadUserInfo();
+            this.generateWeekDays();
+            this.loadAllCourses();
+            this.loadMyEnrollments();
+        },
+        methods: {
+            // 选项卡切换
+            handleTabClick(tab) {
+                if (tab.name === 'mySchedule') {
+                    this.loadMySchedules();
+                }
+            },
+
+            // 加载用户信息
+            loadUserInfo() {
+                // 从主应用获取当前用户信息
+                if (app && app.currentUser) {
+                    this.currentUser = { ...app.currentUser };
+                    this.currentUserId = app.currentUser.id;
+                } else {
+                    this.$message.error('加载用户信息失败');
+                }
+            },
+
+            // 加载所有课程
+            loadAllCourses() {
+                this.loading = true;
+                axios.get(`/api/enrollments/available-courses?userId=${this.currentUserId}`)
+                    .then(response => {
+                        if (response.data.success) {
+                            this.allCourses = response.data.data;
+                        } else {
+                            this.$message.error(response.data.message || '加载课程失败');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('加载课程失败:', error);
+                        this.$message.error('加载课程失败');
+                    })
+                    .finally(() => {
+                        this.loading = false;
+                    });
+            },
+
+            // 加载我的报名记录
+            loadMyEnrollments() {
+                axios.get(`/api/enrollments/my?userId=${this.currentUserId}`)
+                    .then(response => {
+                        if (response.data.success) {
+                            this.myEnrollments = response.data.data;
+                        }
+                    })
+                    .catch(error => {
+                        console.error('加载报名记录失败:', error);
+                        this.$message.error('加载报名记录失败');
+                    });
+            },
+
+            // 加载我的课程表数据（只包含已报名且审核通过的）
+            loadMySchedules() {
+                this.loading = true;
+                const dateStr = this.formatDate(this.currentDate, 'yyyy-MM-dd');
+                axios.get(`/api/enrollments/my-schedule?userId=${this.currentUserId}&date=${dateStr}`)
+                    .then(response => {
+                        if (response.data.success) {
+                            this.mySchedules = response.data.data;
+                        } else {
+                            this.$message.error(response.data.message || '加载课程表失败');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('加载我的课程表失败:', error);
+                        this.$message.error('加载课程表失败');
+                    })
+                    .finally(() => {
+                        this.loading = false;
+                    });
+            },
+
+            // 获取报名状态
+            getEnrollmentStatus(scheduleId) {
+                const enrollment = this.myEnrollments.find(e => e.scheduleId === scheduleId);
+                if (!enrollment) return null;
+                return enrollment.status === 1 ? 'enrolled' : 'pending';
+            },
+
+            // 生成一周日期
+            generateWeekDays() {
+                const start = new Date(this.currentDate);
+                start.setDate(start.getDate() - start.getDay() + 1); // 周一
+
+                this.weekDays = [];
+                const days = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
+
+                for (let i = 0; i < 7; i++) {
+                    const date = new Date(start);
+                    date.setDate(start.getDate() + i);
+                    this.weekDays.push({
+                        name: days[i],
+                        date: this.formatDate(date, 'MM-dd'),
+                        fullDate: this.formatDate(date, 'yyyy-MM-dd')
+                    });
+                }
+            },
+
+            // 根据星期获取我的课程
+            getMySchedulesByDay(dayName) {
+                return this.mySchedules[dayName] || [];
+            },
+
+            // 计算课程样式
+            getCourseStyle(schedule) {
+                const start = new Date(schedule.startTime);
+                const end = new Date(schedule.endTime);
+
+                const startHour = start.getHours();
+                const startMinute = start.getMinutes();
+                const duration = (end - start) / (1000 * 60); // 分钟数
+
+                // 每个时间槽90px高，对应60分钟，所以每分钟对应 90/60 = 1.5px
+                const top = ((startHour - 7) * 60 + startMinute) * (90 / 60);
+                const height = duration * (90 / 60);
+
+                return {
+                    top: top + 'px',
+                    height: height + 'px'
+                };
+            },
+
+            // 格式化方法
+            formatTime(dateTime) {
+                if (!dateTime) return '';
+                const date = new Date(dateTime);
+                return date.getHours().toString().padStart(2, '0') + ':' +
+                    date.getMinutes().toString().padStart(2, '0');
+            },
+
+            formatDateTime(dateTime) {
+                if (!dateTime) return '';
+                const date = new Date(dateTime);
+                return date.toLocaleString('zh-CN', {
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+            },
+
+            formatDate(date, format = 'yyyy-MM-dd') {
+                if (!date) return '';
+                const d = new Date(date);
+                if (format === 'MM-dd') {
+                    return (d.getMonth() + 1).toString().padStart(2, '0') + '-' +
+                        d.getDate().toString().padStart(2, '0');
+                }
+                return d.getFullYear() + '-' +
+                    (d.getMonth() + 1).toString().padStart(2, '0') + '-' +
+                    d.getDate().toString().padStart(2, '0');
+            },
+
+            // 报名课程
+            handleEnroll(schedule) {
+                this.$confirm(`确定要报名"${schedule.courseTitle}"课程吗？`, '报名确认', {
+                    confirmButtonText: '确定',
+                    cancelButtonText: '取消',
+                    type: 'success',
+                }).then(() => {
+                    schedule.enrolling = true;
+
+                    const enrollmentData = {
+                        scheduleId: schedule.id,
+                        userId: this.currentUserId,
+                        realName: this.currentUser.realName,
+                        phone: this.currentUser.phone,
+                        gender: this.currentUser.gender || '未知',
+                        age: this.currentUser.age || 0,
+                        status: 0
+                    };
+
+                    axios.post('/api/enrollments', enrollmentData)
+                        .then(response => {
+                            if (response.data.success) {
+                                this.$message.success('报名成功，等待管理员审核');
+                                this.loadAllCourses();
+                                this.loadMyEnrollments();
+                            } else {
+                                this.$message.error(response.data.message || '报名失败');
+                            }
+                        })
+                        .catch(error => {
+                            console.error('报名失败:', error);
+                            this.$message.error('报名失败');
+                        })
+                        .finally(() => {
+                            schedule.enrolling = false;
+                        });
+                }).catch(() => {});
+            },
+
+            // 取消报名
+            handleCancelEnroll(schedule) {
+                this.$confirm(`确定要取消"${schedule.courseTitle}"课程的报名吗？`, '取消报名确认', {
+                    confirmButtonText: '确定',
+                    cancelButtonText: '取消',
+                    type: 'warning',
+                }).then(() => {
+                    schedule.canceling = true;
+
+                    // 找到对应的报名记录ID
+                    const enrollment = this.myEnrollments.find(e => e.scheduleId === schedule.id);
+                    if (!enrollment) {
+                        this.$message.error('未找到报名记录');
+                        schedule.canceling = false;
+                        return;
+                    }
+
+                    axios.delete(`/api/enrollments/${enrollment.id}`)
+                        .then(response => {
+                            if (response.data.success) {
+                                this.$message.success('取消报名成功');
+                                this.loadAllCourses();
+                                this.loadMyEnrollments();
+                                if (this.activeTab === 'mySchedule') {
+                                    this.loadMySchedules();
+                                }
+                            } else {
+                                this.$message.error(response.data.message || '取消报名失败');
+                            }
+                        })
+                        .catch(error => {
+                            console.error('取消报名失败:', error);
+                            this.$message.error('取消报名失败');
+                        })
+                        .finally(() => {
+                            schedule.canceling = false;
+                        });
+                }).catch(() => {});
+            },
+
+            // 搜索
+            handleSearch() {
+                this.loadAllCourses();
+            },
+
+            // 日期变化
+            handleDateChange() {
+                if (this.scheduleDate) {
+                    this.loadAllCourses();
+                } else {
+                    this.loadAllCourses();
+                }
+            },
+
+            // 周导航
+            prevWeek() {
+                this.currentDate.setDate(this.currentDate.getDate() - 7);
+                this.generateWeekDays();
+                this.loadMySchedules();
+            },
+
+            nextWeek() {
+                this.currentDate.setDate(this.currentDate.getDate() + 7);
+                this.generateWeekDays();
+                this.loadMySchedules();
+            },
+
+            goToday() {
+                this.currentDate = new Date();
+                this.generateWeekDays();
+                this.loadMySchedules();
+            }
+        }
+    });
+</script>

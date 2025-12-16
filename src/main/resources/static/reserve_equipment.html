@@ -1,0 +1,776 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>器材预约</title>
+    <link rel="stylesheet" href="css/lib/all.min.css">
+    <link rel="stylesheet" href="css/index.css">
+    <link rel="stylesheet" href="css/reserve_equipment.css">
+</head>
+<body>
+<div class="container">
+    <h2><i class="fas fa-dumbbell"></i> 器材预约</h2>
+
+    <!-- 标签页 -->
+    <div class="tabs">
+        <div class="tab active" onclick="switchTab('equipment')">器材列表</div>
+        <div class="tab" onclick="switchTab('reservations')">我的预约</div>
+    </div>
+
+    <!-- 器材列表标签页 -->
+    <div id="equipment-tab" class="tab-content active">
+        <!-- 筛选区 -->
+        <div class="filter-section">
+            <div class="filter-row">
+                <div class="filter-item">
+                    <label for="searchName">器材名称:</label>
+                    <input type="text" id="searchName" placeholder="输入器材名称">
+                </div>
+                <div class="filter-item">
+                    <label for="searchType">器材类型:</label>
+                    <select id="searchType">
+                        <option value="">全部</option>
+                        <option value="有氧器械">有氧器械</option>
+                        <option value="力量器械">力量器械</option>
+                        <option value="辅助器械">辅助器械</option>
+                        <option value="功能器械">功能器械</option>
+                    </select>
+                </div>
+                <div class="filter-item">
+                    <label for="searchStatus">状态:</label>
+                    <select id="searchStatus">
+                        <option value="">全部</option>
+                        <option value="AVAILABLE">可用</option>
+                        <option value="MAINTENANCE">保养中</option>
+                        <option value="BROKEN">损坏</option>
+                        <option value="UNAVAILABLE">不可用</option>
+                    </select>
+                </div>
+                <div class="filter-item">
+                    <button class="btn btn-primary" onclick="loadEquipment()">
+                        <i class="fas fa-search"></i> 搜索
+                    </button>
+                    <button class="btn btn-secondary" onclick="resetEquipmentFilters()">
+                        <i class="fas fa-sync"></i> 重置
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 器材列表 -->
+        <div id="equipmentList">
+            <!-- 器材卡片将通过JavaScript动态加载 -->
+        </div>
+
+        <!-- 分页组件 -->
+        <div class="pagination" id="equipmentPagination">
+            <!-- 分页控件将通过JavaScript动态生成 -->
+        </div>
+    </div>
+
+    <!-- 我的预约标签页 -->
+    <div id="reservations-tab" class="tab-content">
+        <!-- 筛选区 -->
+        <div class="filter-section">
+            <div class="filter-row">
+                <div class="filter-item">
+                    <label for="reservationStatus">状态:</label>
+                    <select id="reservationStatus">
+                        <option value="">全部</option>
+                        <option value="PENDING">待审核</option>
+                        <option value="APPROVED">已批准</option>
+                        <option value="REJECTED">已拒绝</option>
+                        <option value="CANCELLED">已取消</option>
+                    </select>
+                </div>
+                <div class="filter-item">
+                    <button class="btn btn-primary" onclick="loadMyReservations()">
+                        <i class="fas fa-search"></i> 搜索
+                    </button>
+                    <button class="btn btn-secondary" onclick="resetReservationFilters()">
+                        <i class="fas fa-sync"></i> 重置
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 预约记录列表 -->
+        <div class="table-container">
+            <table>
+                <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>器材名称</th>
+                    <th>预约日期</th>
+                    <th>开始时间</th>
+                    <th>结束时间</th>
+                    <th>数量</th>
+                    <th>状态</th>
+                    <th>操作</th>
+                </tr>
+                </thead>
+                <tbody id="reservationsTableBody">
+                <!-- 数据将通过JavaScript动态加载 -->
+                </tbody>
+            </table>
+        </div>
+
+        <!-- 分页组件 -->
+        <div class="pagination" id="reservationsPagination">
+            <!-- 分页控件将通过JavaScript动态生成 -->
+        </div>
+    </div>
+
+    <!-- 预约器材对话框 -->
+    <div id="reserveEquipmentModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>预约器材</h3>
+                <span class="close" onclick="closeReserveModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="reserveDate">预约日期:</label>
+                    <input type="date" id="reserveDate" required>
+                </div>
+                <div class="form-group">
+                    <label for="startTime">开始时间:</label>
+                    <input type="time" id="startTime" required>
+                </div>
+                <div class="form-group">
+                    <label for="endTime">结束时间:</label>
+                    <input type="time" id="endTime" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="reserveQuantity">预约数量:</label>
+                    <!-- 仍用 number，但严格按数据库：quantity 必须是正整数 且 <= equipment.available_quantity -->
+                    <input type="number" id="reserveQuantity" min="1" step="1" value="1" required>
+
+                    <!-- 可用数量提示（来自 equipment.available_quantity） -->
+                    <div id="reserveQuantityHint"
+                         style="margin-top:6px;color:#666;font-size:12px;line-height:16px;">
+                        可用数量：-
+                    </div>
+
+                    <!-- 不合法提示：你要求“不合法的都输出不合法就行” -->
+                    <div id="reserveQuantityError"
+                         style="display:block;min-height:18px;margin-top:6px;color:#d00;font-size:12px;line-height:18px;">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="reserveNotes">备注:</label>
+                    <textarea id="reserveNotes" rows="3" placeholder="请输入预约备注（可选）"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" onclick="submitReservation()">确认预约</button>
+                <button class="btn btn-secondary" onclick="closeReserveModal()">取消</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="js/lib/axios.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/dayjs@1.10.7/dayjs.min.js"></script>
+<script>
+    let currentPage = 1;
+    const pageSize = 10;
+    let currentEquipmentId = null;
+
+    // 对齐数据库：equipment.available_quantity
+    let currentAvailableQuantity = 0;
+
+    // 页面加载完成后执行
+    document.addEventListener('DOMContentLoaded', function() {
+        loadEquipment();
+        loadEquipmentTypes(); // 动态加载器材类型
+
+        // 设置默认日期为今天
+        const today = new Date().toISOString().split('T')[0];
+        document.getElementById('reserveDate').value = today;
+
+        // 绑定数量校验：输入/失焦/粘贴都校验并显示“不合法”
+        const qtyInput = document.getElementById('reserveQuantity');
+        qtyInput.addEventListener('input', validateReserveQuantity);
+        qtyInput.addEventListener('blur', validateReserveQuantity);
+        qtyInput.addEventListener('paste', () => setTimeout(validateReserveQuantity, 0));
+
+        // 额外：禁止键盘输入 e/E（科学计数法）、+、-、.（小数点）
+        qtyInput.addEventListener('keydown', function (e) {
+            const blocked = ['e', 'E', '+', '-', '.'];
+            if (blocked.includes(e.key)) e.preventDefault();
+        });
+    });
+
+    function setQtyError(msg) {
+        const el = document.getElementById('reserveQuantityError');
+        if (!el) return;
+        el.textContent = msg || '';
+    }
+
+    function setQtyHint(available) {
+        const hint = document.getElementById('reserveQuantityHint');
+        if (!hint) return;
+        hint.textContent = `可用数量：${available ?? '-'}`;
+    }
+
+    /**
+     * 严格按数据库字段：
+     * - equipment_reservations.quantity: INT 且 >0（正整数）
+     * - 且 quantity <= equipment.available_quantity（你当前 UI 传入的 availableQuantity）
+     * 只要不满足，提示“不合法”（不做自动修正）
+     */
+    function validateReserveQuantity() {
+        const input = document.getElementById('reserveQuantity');
+        if (!input) return false;
+
+        // 关键：不能用 parseInt 直接截断，否则 1.5 会变 1
+        const raw = String(input.value ?? '').trim();
+
+        // 空/非正整数/小数/负数 都不合法
+        if (!/^[1-9]\d*$/.test(raw)) {
+            setQtyError('不合法');
+            return false;
+        }
+
+        const n = Number(raw);
+        if (!Number.isInteger(n) || n <= 0) {
+            setQtyError('不合法');
+            return false;
+        }
+
+        // 对齐 equipment.available_quantity：数量不能大于可用数量
+        // 注意：currentAvailableQuantity 来自 openReserveModal 传入的 available_quantity
+        if (Number.isFinite(currentAvailableQuantity) && currentAvailableQuantity >= 0) {
+            if (n > currentAvailableQuantity) {
+                setQtyError('不合法');
+                return false;
+            }
+        }
+
+        setQtyError('');
+        return true;
+    }
+
+    // 动态加载器材类型
+    function loadEquipmentTypes() {
+        axios.get('/api/equipment')
+            .then(response => {
+                const data = response.data;
+                const equipmentList = data.content || data.data || [];
+
+                // 从器材列表中提取唯一的类型
+                const types = [...new Set(equipmentList.map(eq => eq.type).filter(type => type))];
+
+                // 更新类型下拉框
+                const typeSelect = document.getElementById('searchType');
+                const currentValue = typeSelect.value;
+
+                // 清空现有选项（保留"全部"选项）
+                typeSelect.innerHTML = '<option value="">全部</option>';
+
+                // 添加数据库中的实际类型
+                types.forEach(type => {
+                    const option = document.createElement('option');
+                    option.value = type;
+                    option.textContent = type;
+                    typeSelect.appendChild(option);
+                });
+
+                // 恢复之前选择的值
+                typeSelect.value = currentValue;
+
+                console.log('加载的器材类型:', types);
+            })
+            .catch(error => {
+                console.error('加载器材类型失败:', error);
+            });
+    }
+
+    // 切换标签页
+    function switchTab(tabName) {
+        // 隐藏所有标签页内容
+        document.querySelectorAll('.tab-content').forEach(tab => {
+            tab.classList.remove('active');
+        });
+
+        // 移除所有标签页的active类
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.classList.remove('active');
+        });
+
+        // 显示选中的标签页内容
+        document.getElementById(tabName + '-tab').classList.add('active');
+
+        // 设置选中的标签页为active
+        event.target.classList.add('active');
+
+        // 根据标签页加载相应数据
+        if (tabName === 'equipment') {
+            loadEquipment();
+        } else if (tabName === 'reservations') {
+            loadMyReservations();
+        }
+    }
+
+    // 获取当前用户ID
+    function getCurrentUserId() {
+        try {
+            // 尝试从全局app对象获取
+            if (window.app && window.app.currentUser && window.app.currentUser.id) {
+                return window.app.currentUser.id;
+            }
+
+            // 尝试从localStorage获取
+            const userInfo = localStorage.getItem('userInfo');
+            if (userInfo) {
+                const user = JSON.parse(userInfo);
+                if (user && user.id) {
+                    return user.id;
+                }
+            }
+
+            console.error('无法获取当前用户ID');
+            return null;
+        } catch (error) {
+            console.error('获取用户ID时出错:', error);
+            return null;
+        }
+    }
+
+    // 加载器材列表
+    function loadEquipment(page = 1) {
+        const name = document.getElementById('searchName').value;
+        const type = document.getElementById('searchType').value;
+        const status = document.getElementById('searchStatus').value;
+
+        const params = {
+            page: page,
+            pageSize: pageSize
+        };
+
+        if (name) {
+            params.keyword = name;
+        }
+        if (type) {
+            params.type = type;
+        }
+        if (status) {
+            params.status = status;
+        }
+
+        console.log('搜索参数:', params);
+        console.log('请求URL:', '/api/equipment', '参数:', params);
+
+        axios.get('/api/equipment', { params })
+            .then(response => {
+                console.log('搜索响应数据:', response.data);
+                const data = response.data;
+                renderEquipmentList(data.content || data.data || []);
+                renderPagination(data, 'equipmentPagination', loadEquipment);
+            })
+            .catch(error => {
+                console.error('加载器材列表失败:', error);
+                if (error.response) {
+                    console.error('错误响应数据:', error.response.data);
+                    alert('加载器材列表失败: ' + (error.response.data.message || error.response.status));
+                } else {
+                    alert('加载器材列表失败，请检查网络连接');
+                }
+            });
+    }
+
+    // 渲染器材列表
+    function renderEquipmentList(equipmentList) {
+        const container = document.getElementById('equipmentList');
+        container.innerHTML = '';
+
+        if (equipmentList.length === 0) {
+            container.innerHTML = '<div style="text-align: center; padding: 40px;">暂无器材数据</div>';
+            return;
+        }
+
+        equipmentList.forEach(equipment => {
+            const card = document.createElement('div');
+            card.className = 'equipment-card';
+
+            // 兼容两种字段名：available_quantity 和 availableQuantity
+            const availableQuantity = equipment.available_quantity || equipment.availableQuantity || 0;
+
+            // 对齐数据库：status=AVAILABLE 且 available_quantity>0 才能预约
+            const canReserve = equipment.status === 'AVAILABLE' && availableQuantity > 0;
+
+            const reserveButton = canReserve ?
+                `<button class="btn btn-success" onclick="openReserveModal(${equipment.id}, ${availableQuantity}, '${equipment.name}')">预约</button>` :
+                `<button class="btn btn-disabled" disabled>不可预约</button>`;
+
+            // 设置状态显示样式
+            let statusClass = '';
+            let statusText = '';
+            switch(equipment.status) {
+                case 'AVAILABLE':
+                    statusClass = 'status-available';
+                    statusText = '可用';
+                    break;
+                case 'MAINTENANCE':
+                    statusClass = 'status-maintenance';
+                    statusText = '保养中';
+                    break;
+                case 'BROKEN':
+                    statusClass = 'status-broken';
+                    statusText = '损坏';
+                    break;
+                case 'UNAVAILABLE':
+                    statusClass = 'status-unavailable';
+                    statusText = '不可用';
+                    break;
+                default:
+                    statusClass = 'status-unavailable';
+                    statusText = equipment.status;
+            }
+
+            card.innerHTML = `
+                <div class="equipment-header">
+                    <div class="equipment-name">${equipment.name || '未知器材'}</div>
+                    <div class="${statusClass}">${statusText}</div>
+                </div>
+                <div class="equipment-info">
+                    <div class="info-item">
+                        <span class="info-label">类型:</span>
+                        <span class="info-value">${equipment.type || '-'}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">品牌:</span>
+                        <span class="info-value">${equipment.brand || '-'}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">总数量:</span>
+                        <span class="info-value">${equipment.quantity || 0}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">可用数量:</span>
+                        <span class="info-value">${availableQuantity}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">存放位置:</span>
+                        <span class="info-value">${equipment.location || '-'}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">最近保养:</span>
+                        <span class="info-value">${equipment.maintenance_date || '-'}</span>
+                    </div>
+                </div>
+                ${equipment.description ? `<div style="margin-bottom: 10px;"><strong>描述:</strong> ${equipment.description}</div>` : ''}
+                <div style="text-align: right;">
+                    ${reserveButton}
+                </div>
+            `;
+
+            container.appendChild(card);
+        });
+    }
+
+    // 重置器材筛选条件
+    function resetEquipmentFilters() {
+        document.getElementById('searchName').value = '';
+        document.getElementById('searchType').value = '';
+        document.getElementById('searchStatus').value = '';
+        loadEquipment();
+    }
+
+    // 打开预约对话框
+    function openReserveModal(equipmentId, availableQuantity, equipmentName) {
+        currentEquipmentId = equipmentId;
+
+        // 对齐数据库：equipment.available_quantity
+        currentAvailableQuantity = Number(availableQuantity) || 0;
+
+        // 设置 max 仅作为 UI 辅助（真正校验看 validateReserveQuantity）
+        const qtyInput = document.getElementById('reserveQuantity');
+        qtyInput.max = currentAvailableQuantity;
+        qtyInput.value = 1;
+
+        // 更新提示
+        setQtyHint(currentAvailableQuantity);
+        setQtyError('');
+
+        // 更新对话框标题
+        document.querySelector('#reserveEquipmentModal .modal-header h3').textContent = `预约器材 - ${equipmentName}`;
+
+        document.getElementById('reserveEquipmentModal').style.display = 'block';
+
+        // 打开时立即校验一次，保证提示逻辑生效
+        validateReserveQuantity();
+    }
+
+    // 关闭预约对话框
+    function closeReserveModal() {
+        document.getElementById('reserveEquipmentModal').style.display = 'none';
+        currentEquipmentId = null;
+        currentAvailableQuantity = 0;
+        setQtyHint('-');
+        setQtyError('');
+    }
+
+    // 提交预约
+    function submitReservation() {
+        const userId = getCurrentUserId();
+        if (!userId) {
+            alert('请先登录');
+            return;
+        }
+
+        if (!currentEquipmentId) {
+            alert('请选择要预约的器材');
+            return;
+        }
+
+        // 先校验数量：不合法就只显示“不合法”，并阻止提交
+        if (!validateReserveQuantity()) {
+            return;
+        }
+
+        const reservationData = {
+            userId: userId,
+            equipmentId: currentEquipmentId,
+            reservationDate: document.getElementById('reserveDate').value,
+            startTime: document.getElementById('startTime').value,
+            endTime: document.getElementById('endTime').value,
+            // 对齐数据库：INT 正整数（已由 validateReserveQuantity 严格保证）
+            quantity: Number(String(document.getElementById('reserveQuantity').value).trim()),
+            purpose: document.getElementById('reserveNotes').value
+        };
+
+        // 验证时间
+        if (!reservationData.reservationDate || !reservationData.startTime || !reservationData.endTime) {
+            alert('请填写完整的预约时间信息');
+            return;
+        }
+        if (reservationData.startTime >= reservationData.endTime) {
+            alert('结束时间必须晚于开始时间');
+            return;
+        }
+
+        axios.post('/api/equipment-reservations', reservationData)
+            .then(response => {
+                alert('预约提交成功，等待审核');
+                closeReserveModal();
+                loadEquipment();
+                loadMyReservations();
+            })
+            .catch(error => {
+                console.error('预约失败:', error);
+                if (error.response && error.response.data) {
+                    alert('预约失败: ' + (error.response.data.message || '预约失败'));
+                } else {
+                    alert('预约失败，请稍后重试');
+                }
+            });
+    }
+
+    // 加载我的预约记录
+    function loadMyReservations(page = 1) {
+        const userId = getCurrentUserId();
+        if (!userId) {
+            alert('请先登录');
+            return;
+        }
+
+        const status = document.getElementById('reservationStatus').value;
+
+        const params = {
+            userId: userId,
+            page: page,
+            size: pageSize
+        };
+
+        if (status) {
+            params.status = status;
+        }
+
+        axios.get('/api/equipment-reservations/my', { params })
+            .then(response => {
+                const data = response.data;
+                let reservations = [];
+                if (data.success && data.data) {
+                    reservations = data.data;
+                } else if (data.content) {
+                    reservations = data.content;
+                } else if (Array.isArray(data)) {
+                    reservations = data;
+                }
+
+                console.log('加载到的预约记录:', reservations);
+                renderReservationsTable(reservations);
+
+                if (data.totalPages || data.page) {
+                    renderPagination(data, 'reservationsPagination', loadMyReservations);
+                }
+            })
+            .catch(error => {
+                console.error('加载预约记录失败:', error);
+                if (error.response && error.response.data) {
+                    alert('加载预约记录失败: ' + (error.response.data.message || '加载失败'));
+                } else {
+                    alert('加载预约记录失败，请检查网络连接');
+                }
+            });
+    }
+
+    // 渲染预约记录表格
+    function renderReservationsTable(reservationsList) {
+        const tbody = document.getElementById('reservationsTableBody');
+        tbody.innerHTML = '';
+
+        if (reservationsList.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="8" style="text-align: center;">暂无预约记录</td></tr>';
+            return;
+        }
+
+        reservationsList.forEach(reservation => {
+            const row = document.createElement('tr');
+
+            let statusClass = '';
+            let statusText = '';
+            switch(reservation.status) {
+                case 'PENDING':
+                    statusClass = 'status-pending';
+                    statusText = '待审核';
+                    break;
+                case 'APPROVED':
+                    statusClass = 'status-approved';
+                    statusText = '已批准';
+                    break;
+                case 'REJECTED':
+                    statusClass = 'status-rejected';
+                    statusText = '已拒绝';
+                    break;
+                case 'CANCELLED':
+                    statusClass = 'status-cancelled';
+                    statusText = '已取消';
+                    break;
+                default:
+                    statusClass = 'status-pending';
+                    statusText = reservation.status;
+            }
+
+            let actionButtons = '';
+            if (reservation.status === 'PENDING' || reservation.status === 'APPROVED') {
+                actionButtons = `<button class="btn btn-danger" onclick="cancelReservation(${reservation.id})">取消预约</button>`;
+            } else {
+                actionButtons = '<span style="color: #999;">无可用操作</span>';
+            }
+
+            row.innerHTML = `
+                <td>${reservation.id}</td>
+                <td>${reservation.equipmentName || '未知器材'}</td>
+                <td>${reservation.reservationDate || ''}</td>
+                <td>${reservation.startTime || ''}</td>
+                <td>${reservation.endTime || ''}</td>
+                <td>${reservation.quantity || 1}</td>
+                <td class="${statusClass}">${statusText}</td>
+                <td class="action-buttons">${actionButtons}</td>
+            `;
+
+            tbody.appendChild(row);
+        });
+    }
+
+    // 重置预约筛选条件
+    function resetReservationFilters() {
+        document.getElementById('reservationStatus').value = '';
+        loadMyReservations();
+    }
+
+    // 取消预约
+    function cancelReservation(reservationId) {
+        if (!confirm('确定要取消此预约吗？')) {
+            return;
+        }
+
+        const userId = getCurrentUserId();
+        if (!userId) {
+            alert('请先登录');
+            return;
+        }
+
+        axios.put(`/api/equipment-reservations/${reservationId}/cancel`, null, {
+            params: {
+                cancelledBy: userId,
+                comment: '用户主动取消预约'
+            }
+        })
+            .then(response => {
+                if (response.data.success) {
+                    alert('预约取消成功');
+                    loadMyReservations();
+                } else {
+                    alert('取消失败: ' + (response.data.message || '取消失败'));
+                }
+            })
+            .catch(error => {
+                console.error('取消预约失败:', error);
+                if (error.response && error.response.data) {
+                    alert('取消预约失败: ' + (error.response.data.message || '取消失败'));
+                } else {
+                    alert('取消预约失败，请检查网络连接');
+                }
+            });
+    }
+
+    // 渲染分页组件
+    function renderPagination(data, paginationId, loadFunction) {
+        const pagination = document.getElementById(paginationId);
+        if (!data || !data.totalPages || data.totalPages <= 1) {
+            pagination.innerHTML = '';
+            return;
+        }
+
+        const currentPage = data.number + 1;
+        const totalPages = data.totalPages;
+
+        let paginationHtml = '';
+
+        if (currentPage > 1) {
+            paginationHtml += `<button class="btn btn-secondary" onclick="${loadFunction.name}(${currentPage - 1})">上一页</button>`;
+        }
+
+        const startPage = Math.max(1, currentPage - 2);
+        const endPage = Math.min(totalPages, currentPage + 2);
+
+        for (let i = startPage; i <= endPage; i++) {
+            if (i === currentPage) {
+                paginationHtml += `<button class="btn btn-primary" disabled>${i}</button>`;
+            } else {
+                paginationHtml += `<button class="btn btn-secondary" onclick="${loadFunction.name}(${i})">${i}</button>`;
+            }
+        }
+
+        if (currentPage < totalPages) {
+            paginationHtml += `<button class="btn btn-secondary" onclick="${loadFunction.name}(${currentPage + 1})">下一页</button>`;
+        }
+
+        paginationHtml += `<span style="margin-left: 15px;">第 ${currentPage} 页，共 ${totalPages} 页</span>`;
+        pagination.innerHTML = paginationHtml;
+    }
+
+    // 监听ESC键关闭模态框
+    document.addEventListener('keydown', function(event) {
+        if (event.key === 'Escape') {
+            closeReserveModal();
+        }
+    });
+
+    // 点击模态框外部关闭
+    window.addEventListener('click', function(event) {
+        const reserveEquipmentModal = document.getElementById('reserveEquipmentModal');
+        if (event.target === reserveEquipmentModal) {
+            closeReserveModal();
+        }
+    });
+</script>
+</body>
+</html>

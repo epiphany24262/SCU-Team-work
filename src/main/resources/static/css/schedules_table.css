@@ -1,0 +1,193 @@
+
+.schedule-management {
+    padding: 20px;
+    background: #fff;
+    border-radius: 8px;
+    min-height: 600px;
+}
+
+.toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding: 15px;
+    background: #f8f9fa;
+    border-radius: 6px;
+}
+
+.toolbar .title {
+    font-size: 18px;
+    font-weight: 600;
+    color: #303133;
+    left: 50%;
+    transform: translateX(-50%);
+}
+
+.week-navigation {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.current-week {
+    font-size: 16px;
+    font-weight: 600;
+    color: #303133;
+}
+
+.timetable {
+    border: 1px solid #ebeef5;
+    border-radius: 6px;
+    overflow: hidden;
+    width: 95%; /* 缩小宽度 */
+    margin: 0 auto;
+}
+
+.timetable-header {
+    display: flex;
+    background: #f5f7fa;
+    border-bottom: 1px solid #ebeef5;
+}
+
+.time-column {
+    width: 60px; /* 缩小时间列宽度 */
+    min-height: 80px; /* 增加高度 */
+    border-right: 1px solid #ebeef5;
+}
+
+.day-header {
+    flex: 1;
+    text-align: center;
+    padding: 16px 8px; /* 调整内边距 */
+    border-right: 1px solid #ebeef5;
+    min-width: 0; /* 允许缩小 */
+}
+
+.timetable-body {
+    display: flex;
+    position: relative;
+    height: 1350px; /* 增加整体高度 */
+}
+
+.time-slots {
+    width: 60px; /* 与时间列保持一致 */
+}
+
+.time-slot {
+    height: 90px; /* 增加时间槽高度 */
+    border-bottom: 1px solid #ebeef5;
+    border-right: 1px solid #ebeef5;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    color: #909399;
+    background: #fafafa;
+}
+
+.schedule-grid {
+    flex: 1;
+    display: flex;
+    position: relative;
+}
+
+.day-column {
+    flex: 1;
+    position: relative;
+    border-right: 1px solid #ebeef5;
+    min-width: 0; /* 允许列缩小 */
+}
+
+.hour-slot {
+    height: 90px; /* 增加小时槽高度 */
+    border-bottom: 1px solid #ebeef5;
+}
+
+/* 课程卡片样式优化 */
+.course-card {
+    position: absolute;
+    left: 2px;
+    right: 2px;
+    border-radius: 6px;
+    padding: 10px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    overflow: hidden;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+}
+
+.course-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.course-content {
+    font-size: 12px;
+    color: white;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+/* 多彩课程样式 */
+.course-color-0 {
+    background: linear-gradient(135deg, #409EFF, #66b1ff);
+}
+.course-color-1 {
+    background: linear-gradient(135deg, #67C23A, #85ce61);
+}
+.course-color-2 {
+    background: linear-gradient(135deg, #E6A23C, #ebb563);
+}
+.course-color-3 {
+    background: linear-gradient(135deg, #F56C6C, #f78989);
+}
+.course-color-4 {
+    background: linear-gradient(135deg, #909399, #a6a9ad);
+}
+.course-color-5 {
+    background: linear-gradient(135deg, #8E44AD, #9b59b6);
+}
+
+.course-title {
+    font-weight: 600;
+    margin-bottom: 6px;
+    font-size: 13px;
+}
+
+.course-time {
+    opacity: 0.9;
+    margin-bottom: 6px;
+}
+
+.course-info {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 6px;
+    opacity: 0.9;
+    font-size: 11px;
+}
+
+.course-capacity {
+    text-align: right;
+    font-weight: 600;
+    font-size: 11px;
+}
+
+.course-actions {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    opacity: 0;
+    transition: opacity 0.3s;
+}
+
+.course-card:hover .course-actions {
+    opacity: 1;
+}
+
+/* 调整删除按钮在彩色背景上的可见性 */
+.course-card .el-button--danger {
+    background-color: rgba(255, 255, 255, 0.9);
+    border-color: rgba(255, 255, 255, 0.9);
+    color: #F56C6C;
+}

@@ -1,0 +1,454 @@
+
+<link rel="stylesheet" href="css/schedules_table.css">
+
+<div class="schedule-management">
+    <!-- 工具栏 -->
+    <div class="toolbar">
+        <el-button type="primary" @click="handleAddSchedule" icon="el-icon-plus">
+            新增排班
+        </el-button>
+
+        <div class="title">课程排班表</div>
+
+        <div class="week-navigation">
+            <el-button @click="prevWeek" icon="el-icon-arrow-left" size="small"></el-button>
+            <span class="current-week">{{ currentWeekRange }}</span>
+            <el-button @click="nextWeek" icon="el-icon-arrow-right" size="small"></el-button>
+            <el-button @click="goToday" type="text">今天</el-button>
+        </div>
+    </div>
+
+    <!-- 周课程表 -->
+    <div class="timetable">
+        <div class="timetable-header">
+            <div class="time-column"></div>
+            <div class="day-header" v-for="day in weekDays" :key="day.date">
+                <div class="day-name">{{ day.name }}</div>
+                <div class="day-date">{{ day.date }}</div>
+            </div>
+        </div>
+
+        <div class="timetable-body">
+            <div class="time-slots">
+                <div class="time-slot" v-for="hour in timeSlots" :key="hour">
+                    {{ hour }}:00
+                </div>
+            </div>
+
+            <div class="schedule-grid">
+                <div class="day-column" v-for="day in weekDays" :key="day.date">
+                    <div class="hour-slot" v-for="hour in timeSlots" :key="hour"></div>
+
+                    <!-- 课程卡片 - 添加动态颜色类 -->
+                    <div class="course-card"
+                         v-for="schedule in getSchedulesByDay(day.name)"
+                         :key="schedule.id"
+                         :class="`course-color-${schedule.colorType || (schedule.id % 6)}`"
+                         :style="getCourseStyle(schedule)"
+                         @click="handleEditSchedule(schedule)">
+                        <div class="course-content">
+                            <div class="course-title">{{ schedule.courseTitle }}</div>
+                            <div class="course-time">{{ formatTime(schedule.startTime) }}-{{ formatTime(schedule.endTime) }}</div>
+                            <div class="course-info">
+                                <span class="coach">{{ schedule.coachName }}</span>
+                                <span class="room">{{ schedule.roomName }}</span>
+                            </div>
+                            <div class="course-capacity">
+                                {{ schedule.currentStudents }}/{{ schedule.maxStudents }}
+                            </div>
+                        </div>
+                        <div class="course-actions">
+                            <el-button
+                                    size="mini"
+                                    type="danger"
+                                    icon="el-icon-delete"
+                                    @click.stop="handleDeleteSchedule(schedule)"
+                            ></el-button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 添加/编辑课程对话框 -->
+    <el-dialog
+            :title="dialogTitle"
+            :visible.sync="dialogVisible"
+            width="600px"
+            @close="handleDialogClose">
+        <el-form :model="scheduleForm" :rules="rules" ref="scheduleForm" label-width="100px">
+            <el-form-item label="课程" prop="courseId">
+                <el-select v-model="scheduleForm.courseId" placeholder="选择课程" style="width: 100%">
+                    <el-option
+                            v-for="course in courses"
+                            :key="course.id"
+                            :label="course.title"
+                            :value="course.id">
+                    </el-option>
+                </el-select>
+            </el-form-item>
+
+            <el-form-item label="教练" prop="coachId">
+                <el-select v-model="scheduleForm.coachId" placeholder="选择教练" style="width: 100%">
+                    <el-option
+                            v-for="coach in coaches"
+                            :key="coach.id"
+                            :label="coach.name"
+                            :value="coach.id">
+                    </el-option>
+                </el-select>
+            </el-form-item>
+
+            <el-form-item label="教室" prop="roomId">
+                <el-select v-model="scheduleForm.roomId" placeholder="选择教室" style="width: 100%">
+                    <el-option
+                            v-for="room in rooms"
+                            :key="room.id"
+                            :label="room.name"
+                            :value="room.id">
+                    </el-option>
+                </el-select>
+            </el-form-item>
+
+            <el-form-item label="日期时间" required>
+                <el-col :span="11">
+                    <el-form-item prop="date">
+                        <el-date-picker
+                                v-model="scheduleForm.date"
+                                type="date"
+                                placeholder="选择日期"
+                                style="width: 100%">
+                        </el-date-picker>
+                    </el-form-item>
+                </el-col>
+                <el-col :span="2" class="text-center">-</el-col>
+                <el-col :span="5">
+                    <el-form-item prop="startTime">
+                        <el-time-picker
+                                v-model="scheduleForm.startTime"
+                                placeholder="开始时间"
+                                style="width: 100%">
+                        </el-time-picker>
+                    </el-form-item>
+                </el-col>
+                <el-col :span="1" class="text-center">-</el-col>
+                <el-col :span="5">
+                    <el-form-item prop="endTime">
+                        <el-time-picker
+                                v-model="scheduleForm.endTime"
+                                placeholder="结束时间"
+                                style="width: 100%">
+                        </el-time-picker>
+                    </el-form-item>
+                </el-col>
+            </el-form-item>
+
+            <el-form-item label="最大人数" prop="maxStudents">
+                <el-input-number
+                        v-model="scheduleForm.maxStudents"
+                        :min="1"
+                        :max="50"
+                        style="width: 100%">
+                </el-input-number>
+            </el-form-item>
+
+            <el-form-item label="状态" prop="status">
+                <el-radio-group v-model="scheduleForm.status">
+                    <el-radio :label="1">启用</el-radio>
+                    <el-radio :label="0">停用</el-radio>
+                </el-radio-group>
+            </el-form-item>
+        </el-form>
+
+        <div slot="footer" class="dialog-footer">
+            <el-button @click="dialogVisible = false">取消</el-button>
+            <el-button type="primary" @click="handleSubmit" :loading="submitting">确定</el-button>
+        </div>
+    </el-dialog>
+</div>
+
+<script>
+    new Vue({
+        el: '.schedule-management',
+        data() {
+            return {
+                schedules: {},
+                loading: false,
+                currentDate: new Date(),
+                viewType: 'week',
+                timeSlots: [7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21],
+                weekDays: [],
+
+                // 对话框相关
+                dialogVisible: false,
+                dialogTitle: '新增课程',
+                submitting: false,
+                scheduleForm: {
+                    id: null,
+                    courseId: null,
+                    coachId: null,
+                    roomId: null,
+                    date: null,
+                    startTime: null,
+                    endTime: null,
+                    maxStudents: 20,
+                    status: 1
+                },
+                rules: {
+                    courseId: [{ required: true, message: '请选择课程', trigger: 'change' }],
+                    coachId: [{ required: true, message: '请选择教练', trigger: 'change' }],
+                    roomId: [{ required: true, message: '请选择教室', trigger: 'change' }],
+                    date: [{ required: true, message: '请选择日期', trigger: 'change' }],
+                    startTime: [{ required: true, message: '请选择开始时间', trigger: 'change' }],
+                    endTime: [{ required: true, message: '请选择结束时间', trigger: 'change' }],
+                    maxStudents: [{ required: true, message: '请输入最大人数', trigger: 'blur' }]
+                },
+
+                // 选项数据
+                courses: [],
+                coaches: [],
+                rooms: []
+            }
+        },
+        computed: {
+            currentWeekRange() {
+                if (this.weekDays.length === 0) return '';
+                const start = this.weekDays[0].date;
+                const end = this.weekDays[6].date;
+                return `${start} - ${end}`;
+            }
+        },
+        mounted() {
+            this.generateWeekDays();
+            this.loadSchedules();
+            this.loadOptions();
+        },
+        methods: {
+            // 生成一周日期
+            generateWeekDays() {
+                const start = new Date(this.currentDate);
+                start.setDate(start.getDate() - start.getDay() + 1); // 周一
+
+                this.weekDays = [];
+                const days = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
+
+                for (let i = 0; i < 7; i++) {
+                    const date = new Date(start);
+                    date.setDate(start.getDate() + i);
+                    this.weekDays.push({
+                        name: days[i],
+                        date: this.formatDate(date, 'MM-dd'),
+                        fullDate: this.formatDate(date, 'yyyy-MM-dd')
+                    });
+                }
+            },
+
+            // 加载课程表数据
+            loadSchedules() {
+                this.loading = true;
+                const dateStr = this.formatDate(this.currentDate, 'yyyy-MM-dd');
+
+                axios.get(`/api/schedules/weekly?date=${dateStr}`)
+                    .then(response => {
+                        if (response.data.success) {
+                            this.schedules = response.data.data;
+                        } else {
+                            this.$message.error(response.data.message || '加载失败');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('加载失败:', error);
+                        this.$message.error('加载失败');
+                    })
+                    .finally(() => {
+                        this.loading = false;
+                    });
+            },
+
+            // 加载选项数据
+            loadOptions() {
+                // 这里需要根据您的实际API调整
+                axios.get('/api/schedules/courses').then(res => this.courses = res.data.data || []);
+                axios.get('/api/schedules/coaches').then(res => this.coaches = res.data.data || []);
+                axios.get('/api/schedules/rooms').then(res => this.rooms = res.data.data || []);
+            },
+
+            // 根据星期获取课程
+            getSchedulesByDay(dayName) {
+                return this.schedules[dayName] || [];
+            },
+
+            // 计算课程样式（位置和高度）
+            getCourseStyle(schedule) {
+                const start = new Date(schedule.startTime);
+                const end = new Date(schedule.endTime);
+
+                const startHour = start.getHours();
+                const startMinute = start.getMinutes();
+                const duration = (end - start) / (1000 * 60); // 分钟数
+
+                // 每个时间槽90px高，对应60分钟，所以每分钟对应 90/60 = 1.5px
+                const top = ((startHour - 7) * 60 + startMinute) * (90 / 60);
+                const height = duration * (90 / 60);
+
+                return {
+                    top: top + 'px',
+                    height: height + 'px'
+                };
+            },
+
+            // 格式化时间
+            formatTime(dateTime) {
+                if (!dateTime) return '';
+                const date = new Date(dateTime);
+                return date.getHours().toString().padStart(2, '0') + ':' +
+                    date.getMinutes().toString().padStart(2, '0');
+            },
+
+            // 格式化日期
+            formatDate(date, format = 'yyyy-MM-dd') {
+                if (!date) return '';
+                const d = new Date(date);
+                if (format === 'MM-dd') {
+                    return (d.getMonth() + 1).toString().padStart(2, '0') + '-' +
+                        d.getDate().toString().padStart(2, '0');
+                }
+                return d.getFullYear() + '-' +
+                    (d.getMonth() + 1).toString().padStart(2, '0') + '-' +
+                    d.getDate().toString().padStart(2, '0');
+            },
+
+            // 新增课程
+            handleAddSchedule() {
+                this.dialogTitle = '新增课程';
+                this.scheduleForm = {
+                    id: null,
+                    courseId: null,
+                    coachId: null,
+                    roomId: null,
+                    date: new Date(),
+                    startTime: null,
+                    endTime: null,
+                    maxStudents: 20,
+                    status: 1
+                };
+                this.dialogVisible = true;
+            },
+
+            // 编辑课程
+            handleEditSchedule(schedule) {
+                this.dialogTitle = '编辑课程';
+                this.scheduleForm = {
+                    id: schedule.id,
+                    courseId: schedule.courseId,
+                    coachId: schedule.coachId,
+                    roomId: schedule.roomId,
+                    date: new Date(schedule.startTime),
+                    startTime: new Date(schedule.startTime),
+                    endTime: new Date(schedule.endTime),
+                    maxStudents: schedule.maxStudents,
+                    status: schedule.status
+                };
+                this.dialogVisible = true;
+            },
+
+            // 删除课程
+            handleDeleteSchedule(schedule) {
+                this.$confirm(`确定要删除"${schedule.courseTitle}"课程吗？`, '删除确认', {
+                    confirmButtonText: '确定',
+                    cancelButtonText: '取消',
+                    type: 'warning',
+                }).then(() => {
+                    axios.delete(`/api/schedules/${schedule.id}`)
+                        .then(response => {
+                            if (response.data.success) {
+                                this.$message.success('删除成功');
+                                this.loadSchedules();
+                            } else {
+                                this.$message.error(response.data.message || '删除失败');
+                            }
+                        })
+                        .catch(error => {
+                            console.error('删除失败:', error);
+                            this.$message.error('删除失败');
+                        });
+                }).catch(() => {});
+            },
+
+            // 提交表单
+            handleSubmit() {
+                this.$refs.scheduleForm.validate((valid) => {
+                    if (!valid) return;
+
+                    this.submitting = true;
+
+                    // 组合日期时间
+                    const startDateTime = this.combineDateTime(this.scheduleForm.date, this.scheduleForm.startTime);
+                    const endDateTime = this.combineDateTime(this.scheduleForm.date, this.scheduleForm.endTime);
+
+                    const formData = {
+                        ...this.scheduleForm,
+                        startTime: startDateTime,
+                        endTime: endDateTime,
+                        currentStudents: 0
+                    };
+
+                    const request = formData.id
+                        ? axios.put(`/api/schedules/${formData.id}`, formData)
+                        : axios.post('/api/schedules', formData);
+
+                    request.then(response => {
+                        if (response.data.success) {
+                            this.$message.success(formData.id ? '更新成功' : '添加成功');
+                            this.dialogVisible = false;
+                            this.loadSchedules();
+                        } else {
+                            this.$message.error(response.data.message || '操作失败');
+                        }
+                    }).catch(error => {
+                        console.error('操作失败:', error);
+                        this.$message.error('操作失败');
+                    }).finally(() => {
+                        this.submitting = false;
+                    });
+                });
+            },
+
+            // 组合日期和时间
+            combineDateTime(date, time) {
+                if (!date || !time) return null;
+
+                const dateStr = this.formatDate(date, 'yyyy-MM-dd');
+                const timeStr = this.formatTime(time);
+
+                // 使用ISO格式，秒和毫秒设为0
+                return new Date(dateStr + 'T' + timeStr + ':00.000Z');
+            },
+
+            // 对话框关闭
+            handleDialogClose() {
+                this.$refs.scheduleForm.clearValidate();
+            },
+
+            // 周导航
+            prevWeek() {
+                this.currentDate.setDate(this.currentDate.getDate() - 7);
+                this.generateWeekDays();
+                this.loadSchedules();
+            },
+
+            nextWeek() {
+                this.currentDate.setDate(this.currentDate.getDate() + 7);
+                this.generateWeekDays();
+                this.loadSchedules();
+            },
+
+            goToday() {
+                this.currentDate = new Date();
+                this.generateWeekDays();
+                this.loadSchedules();
+            }
+        }
+    });
+</script>

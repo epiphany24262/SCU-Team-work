@@ -1,0 +1,412 @@
+<link rel="stylesheet" href="css/schedules_course.css">
+
+<div class="course-management">
+    <h1 class="page-title">课程管理</h1>
+    <!-- 工具栏 -->
+    <div class="toolbar">
+        <el-button type="primary" @click="handleAddCourse" icon="el-icon-plus">
+            添加课程
+        </el-button>
+
+        <div class="search-box">
+            <el-input
+                    v-model="searchKeyword"
+                    placeholder="搜索课程名称或类型"
+                    clearable
+                    @clear="handleSearch"
+                    @keyup.enter="handleSearch"
+                    style="width: 300px;"
+            >
+                <template #append>
+                    <el-button @click="handleSearch" icon="el-icon-search"></el-button>
+                </template>
+            </el-input>
+        </div>
+    </div>
+
+    <!-- 课程表格 -->
+    <div class="table-container">
+        <el-table
+                :data="courses"
+                v-loading="loading"
+                empty-text="暂无课程数据"
+                style="width: 100%"
+        >
+            <el-table-column prop="id" label="ID" width="80"></el-table-column>
+            <el-table-column prop="title" label="课程名称" min-width="150"></el-table-column>
+            <el-table-column prop="type" label="类型" width="120"></el-table-column>
+            <el-table-column prop="difficulty" label="难度" width="100">
+                <template slot-scope="scope">
+                    <el-tag
+                            :type="getDifficultyType(scope.row.difficulty)"
+                            size="small"
+                    >
+                        {{ scope.row.difficulty }}
+                    </el-tag>
+                </template>
+            </el-table-column>
+            <el-table-column prop="duration" label="时长(分钟)" width="100"></el-table-column>
+            <el-table-column label="操作" width="280" fixed="right">
+                <template slot-scope="scope">
+                    <div class="action-buttons">
+                        <el-button
+                                size="small"
+                                type="info"
+                                @click="handleViewDetail(scope.row)"
+                                icon="el-icon-view"
+                        >
+                            详情
+                        </el-button>
+                        <el-button
+                                size="small"
+                                @click="handleEditCourse(scope.row)"
+                                icon="el-icon-edit"
+                        >
+                            编辑
+                        </el-button>
+                        <el-button
+                                size="small"
+                                type="danger"
+                                @click="handleDeleteCourse(scope.row)"
+                                icon="el-icon-delete"
+                        >
+                            删除
+                        </el-button>
+                    </div>
+                </template>
+            </el-table-column>
+        </el-table>
+    </div>
+
+    <!-- 分页 -->
+    <div class="pagination">
+        <el-pagination
+                :current-page="currentPage"
+                :page-size="pageSize"
+                :page-sizes="[10, 20, 50, 100]"
+                :total="total"
+                layout="total, sizes, prev, pager, next, jumper"
+                @size-change="handleSizeChange"
+                @current-change="handleCurrentChange"
+        />
+    </div>
+
+    <!-- 添加/编辑课程对话框 -->
+    <el-dialog
+            :title="dialogTitle"
+            :visible.sync="dialogVisible"
+            width="600px"
+            @close="handleDialogClose"
+    >
+        <el-form
+                :model="courseForm"
+                :rules="courseRules"
+                ref="courseForm"
+                label-width="100px"
+        >
+            <el-form-item label="课程名称" prop="title">
+                <el-input v-model="courseForm.title" placeholder="请输入课程名称"></el-input>
+            </el-form-item>
+
+            <el-form-item label="课程描述" prop="content">
+                <el-input
+                        v-model="courseForm.content"
+                        type="textarea"
+                        :rows="3"
+                        placeholder="请输入课程描述"
+                ></el-input>
+            </el-form-item>
+
+            <el-row :gutter="20">
+                <el-col :span="12">
+                    <el-form-item label="课程类型" prop="type">
+                        <el-select v-model="courseForm.type" placeholder="请选择课程类型" style="width: 100%">
+                            <el-option label="瑜伽" value="瑜伽"></el-option>
+                            <el-option label="动感单车" value="动感单车"></el-option>
+                            <el-option label="拳击" value="拳击"></el-option>
+                            <el-option label="普拉提" value="普拉提"></el-option>
+                            <el-option label="力量训练" value="力量训练"></el-option>
+                            <el-option label="舞蹈" value="舞蹈"></el-option>
+                            <el-option label="泰拳" value="泰拳"></el-option>
+                            <el-option label="康复训练" value="康复训练"></el-option>
+                            <el-option label="拉伸" value="拉伸"></el-option>
+                        </el-select>
+                    </el-form-item>
+                </el-col>
+                <el-col :span="12">
+                    <el-form-item label="难度等级" prop="difficulty">
+                        <el-select v-model="courseForm.difficulty" placeholder="请选择难度" style="width: 100%">
+                            <el-option label="初级" value="初级"></el-option>
+                            <el-option label="中级" value="中级"></el-option>
+                            <el-option label="高级" value="高级"></el-option>
+                        </el-select>
+                    </el-form-item>
+                </el-col>
+            </el-row>
+
+            <el-form-item label="课程时长" prop="duration">
+                <el-input-number
+                        v-model="courseForm.duration"
+                        :min="1"
+                        :max="180"
+                        style="width: 100%"
+                        placeholder="请输入课程时长(分钟)"
+                />
+            </el-form-item>
+        </el-form>
+
+        <div slot="footer" class="dialog-footer">
+            <el-button @click="dialogVisible = false">取消</el-button>
+            <el-button type="primary" @click="handleSaveCourse" :loading="saveLoading">保存</el-button>
+        </div>
+    </el-dialog>
+
+    <!-- 课程详情对话框 -->
+    <el-dialog
+            title="课程详情"
+            :visible.sync="detailDialogVisible"
+            width="600px"
+    >
+        <el-descriptions :column="2" border v-if="currentCourse">
+            <el-descriptions-item label="课程ID">{{ currentCourse.id }}</el-descriptions-item>
+            <el-descriptions-item label="课程名称">{{ currentCourse.title }}</el-descriptions-item>
+            <el-descriptions-item label="课程描述" :span="2">
+                <div style="max-height: 100px; overflow-y: auto;">
+                    {{ currentCourse.content || '暂无描述' }}
+                </div>
+            </el-descriptions-item>
+            <el-descriptions-item label="课程类型">{{ currentCourse.type }}</el-descriptions-item>
+            <el-descriptions-item label="难度等级">
+                <el-tag :type="getDifficultyType(currentCourse.difficulty)">
+                    {{ currentCourse.difficulty }}
+                </el-tag>
+            </el-descriptions-item>
+            <el-descriptions-item label="课程时长">{{ currentCourse.duration }} 分钟</el-descriptions-item>
+            <el-descriptions-item label="创建时间">{{ formatDate(currentCourse.createdAt) }}</el-descriptions-item>
+            <el-descriptions-item label="更新时间">{{ formatDate(currentCourse.updatedAt) }}</el-descriptions-item>
+        </el-descriptions>
+
+        <div slot="footer" class="dialog-footer">
+            <el-button type="primary" @click="detailDialogVisible = false">关闭</el-button>
+        </div>
+    </el-dialog>
+</div>
+
+<script>
+    new Vue({
+        el: '.course-management',
+        data() {
+            return {
+                courses: [],
+                loading: false,
+                currentPage: 1,
+                pageSize: 10,
+                total: 0,
+                searchKeyword: '',
+
+                // 对话框相关
+                dialogVisible: false,
+                detailDialogVisible: false,
+                dialogTitle: '添加课程',
+                saveLoading: false,
+                currentCourse: null,
+
+                // 表单数据
+                courseForm: {
+                    id: null,
+                    title: '',
+                    content: '',
+                    type: '',
+                    difficulty: '',
+                    duration: 60,
+                },
+
+                // 表单验证规则
+                courseRules: {
+                    title: [
+                        { required: true, message: '请输入课程名称', trigger: 'blur' },
+                        { min: 2, max: 50, message: '课程名称长度在 2 到 50 个字符', trigger: 'blur' }
+                    ],
+                    content: [
+                        { required: true, message: '请输入课程描述', trigger: 'blur' },
+                        { min: 5, max: 500, message: '课程描述长度在 5 到 500 个字符', trigger: 'blur' }
+                    ],
+                    type: [
+                        { required: true, message: '请选择课程类型', trigger: 'change' }
+                    ],
+                    difficulty: [
+                        { required: true, message: '请选择难度等级', trigger: 'change' }
+                    ],
+                    duration: [
+                        { required: true, message: '请输入课程时长', trigger: 'blur' },
+                        { type: 'number', min: 1, max: 180, message: '时长必须在 1 到 180 分钟之间', trigger: 'blur' }
+                    ]
+                }
+            }
+        },
+        mounted() {
+            this.loadCourses();
+        },
+        methods: {
+            loadCourses() {
+                this.loading = true;
+
+                axios.post('/api/courses/page', {
+                    page: this.currentPage,
+                    pageSize: this.pageSize,
+                    keyword: this.searchKeyword,
+                })
+                    .then(response => {
+                        if (response.data.success) {
+                            this.courses = response.data.data;
+                            this.total = response.data.total;
+                        } else {
+                            this.$message.error(response.data.message || '加载课程失败');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('加载课程失败:', error);
+                        this.$message.error('加载课程失败');
+                    })
+                    .finally(() => {
+                        this.loading = false;
+                    });
+            },
+
+            // 添加课程
+            handleAddCourse() {
+                this.dialogTitle = '添加课程';
+                this.courseForm = {
+                    id: null,
+                    title: '',
+                    content: '',
+                    type: '',
+                    difficulty: '',
+                    duration: 60,
+                };
+                this.dialogVisible = true;
+                this.$nextTick(() => {
+                    if (this.$refs.courseForm) {
+                        this.$refs.courseForm.clearValidate();
+                    }
+                });
+            },
+
+            // 编辑课程
+            handleEditCourse(course) {
+                this.dialogTitle = '编辑课程';
+                this.courseForm = {
+                    id: course.id,
+                    title: course.title,
+                    content: course.content,
+                    type: course.type,
+                    difficulty: course.difficulty,
+                    duration: course.duration
+                };
+                this.dialogVisible = true;
+                this.$nextTick(() => {
+                    if (this.$refs.courseForm) {
+                        this.$refs.courseForm.clearValidate();
+                    }
+                });
+            },
+
+            // 查看详情
+            handleViewDetail(course) {
+                this.currentCourse = course;
+                this.detailDialogVisible = true;
+            },
+
+            // 保存课程
+            handleSaveCourse() {
+                this.$refs.courseForm.validate((valid) => {
+                    if (valid) {
+                        this.saveLoading = true;
+
+                        const apiUrl = this.courseForm.id ? '/api/courses/update' : '/api/courses/add';
+                        const successMessage = this.courseForm.id ? '更新成功' : '添加成功';
+
+                        axios.post(apiUrl, this.courseForm)
+                            .then(response => {
+                                if (response.data.success) {
+                                    this.$message.success(successMessage);
+                                    this.dialogVisible = false;
+                                    this.loadCourses();
+                                } else {
+                                    this.$message.error(response.data.message || '保存失败');
+                                }
+                            })
+                            .catch(error => {
+                                console.error('保存课程失败:', error);
+                                this.$message.error('保存失败');
+                            })
+                            .finally(() => {
+                                this.saveLoading = false;
+                            });
+                    }
+                });
+            },
+
+            // 删除课程
+            handleDeleteCourse(course) {
+                this.$confirm(`确定要删除课程 "${course.title}" 吗？`, '删除确认', {
+                    confirmButtonText: '确定',
+                    cancelButtonText: '取消',
+                    type: 'warning',
+                }).then(() => {
+                    axios.post('/api/courses/delete', { id: course.id })
+                        .then(response => {
+                            if (response.data.success) {
+                                this.$message.success('删除成功');
+                                this.loadCourses();
+                            } else {
+                                this.$message.error(response.data.message || '删除失败');
+                            }
+                        })
+                        .catch(error => {
+                            console.error('删除课程失败:', error);
+                            this.$message.error('删除失败');
+                        });
+                }).catch(() => {});
+            },
+
+            // 搜索
+            handleSearch() {
+                this.currentPage = 1;
+                this.loadCourses();
+            },
+
+            // 分页
+            handleSizeChange(newSize) {
+                this.pageSize = newSize;
+                this.currentPage = 1;
+                this.loadCourses();
+            },
+
+            handleCurrentChange(newPage) {
+                this.currentPage = newPage;
+                this.loadCourses();
+            },
+
+            // 对话框关闭
+            handleDialogClose() {
+                this.$refs.courseForm.clearValidate();
+            },
+
+            // 工具方法
+            formatDate(dateString) {
+                if (!dateString) return '';
+                return new Date(dateString).toLocaleString('zh-CN');
+            },
+
+            getDifficultyType(difficulty) {
+                const types = {
+                    '初级': 'success',
+                    '中级': 'warning',
+                    '高级': 'danger'
+                };
+                return types[difficulty] || 'info';
+            }
+        }
+    });
+</script>

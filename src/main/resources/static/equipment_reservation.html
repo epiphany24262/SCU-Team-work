@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>器材预约管理</title>
+    <link rel="stylesheet" href="css/lib/all.min.css">
+    <link rel="stylesheet" href="css/index.css">
+    <style>
+        .container {
+            padding: 20px;
+        }
+        .filter-section {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        .filter-row {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .filter-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .filter-item label {
+            white-space: nowrap;
+        }
+        .filter-item input, .filter-item select {
+            padding: 5px 10px;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+        }
+        .btn {
+            padding: 8px 15px;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+            margin-right: 5px;
+        }
+        .btn-primary {
+            background-color: #007bff;
+            color: white;
+        }
+        .btn-secondary {
+            background-color: #6c757d;
+            color: white;
+        }
+        .btn-success {
+            background-color: #28a745;
+            color: white;
+        }
+        .btn-danger {
+            background-color: #dc3545;
+            color: white;
+        }
+        .table-container {
+            overflow-x: auto;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        th {
+            background-color: #f8f9fa;
+            font-weight: bold;
+        }
+        .status-pending {
+            color: #ffc107;
+            font-weight: bold;
+        }
+        .status-approved {
+            color: #28a745;
+            font-weight: bold;
+        }
+        .status-rejected {
+            color: #dc3545;
+            font-weight: bold;
+        }
+        .status-cancelled {
+            color: #6c757d;
+            font-weight: bold;
+        }
+        .action-buttons button {
+            margin-right: 5px;
+            padding: 3px 8px;
+            font-size: 12px;
+        }
+        .pagination {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+            z-index: 1000;
+        }
+        .modal-content {
+            background-color: white;
+            margin: 10% auto;
+            padding: 20px;
+            border-radius: 5px;
+            width: 80%;
+            max-width: 600px;
+        }
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #eee;
+        }
+        .close {
+            font-size: 24px;
+            cursor: pointer;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        .form-group input, .form-group select, .form-group textarea {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+            box-sizing: border-box;
+        }
+        .modal-footer {
+            margin-top: 20px;
+            text-align: right;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2><i class="fas fa-calendar-check"></i> 器材预约管理</h2>
+        
+        <!-- 筛选区 -->
+        <div class="filter-section">
+            <div class="filter-row">
+                <div class="filter-item">
+                    <label for="searchUserId">用户ID:</label>
+                    <input type="text" id="searchUserId" placeholder="请输入用户ID">
+                </div>
+                <div class="filter-item">
+                    <label for="searchEquipmentId">器材ID:</label>
+                    <input type="text" id="searchEquipmentId" placeholder="请输入器材ID">
+                </div>
+                <div class="filter-item">
+                    <label for="searchStatus">状态:</label>
+                    <select id="searchStatus">
+                        <option value="">全部</option>
+                        <option value="PENDING">待审核</option>
+                        <option value="APPROVED">已批准</option>
+                        <option value="REJECTED">已拒绝</option>
+                        <option value="CANCELLED">已取消</option>
+                    </select>
+                </div>
+                <div class="filter-item">
+                    <button class="btn btn-primary" onclick="loadReservations()">
+                        <i class="fas fa-search"></i> 搜索
+                    </button>
+                    <button class="btn btn-secondary" onclick="resetFilters()">
+                        <i class="fas fa-sync"></i> 重置
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 预约列表 -->
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>用户ID</th>
+                        <th>器材名称</th>
+                        <th>预约日期</th>
+                        <th>开始时间</th>
+                        <th>结束时间</th>
+                        <th>状态</th>
+                        <th>创建时间</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody id="reservationsTableBody">
+                    <!-- 数据将通过JavaScript动态加载 -->
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- 分页组件 -->
+        <div class="pagination" id="pagination">
+            <!-- 分页控件将通过JavaScript动态生成 -->
+        </div>
+    </div>
+    
+    <!-- 审核对话框 -->
+    <div id="reviewModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>审核预约</h3>
+                <span class="close" onclick="closeReviewModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="reviewReservationId">
+                <div class="form-group">
+                    <label>预约ID:</label>
+                    <input type="text" id="reviewId" readonly>
+                </div>
+                <div class="form-group">
+                    <label>用户ID:</label>
+                    <input type="text" id="reviewUserId" readonly>
+                </div>
+                <div class="form-group">
+                    <label>器材名称:</label>
+                    <input type="text" id="reviewEquipmentName" readonly>
+                </div>
+                <div class="form-group">
+                    <label>预约日期:</label>
+                    <input type="text" id="reviewDate" readonly>
+                </div>
+                <div class="form-group">
+                    <label>开始时间:</label>
+                    <input type="text" id="reviewStartTime" readonly>
+                </div>
+                <div class="form-group">
+                    <label>结束时间:</label>
+                    <input type="text" id="reviewEndTime" readonly>
+                </div>
+                <div class="form-group">
+                    <label for="reviewStatus">审核结果:</label>
+                    <select id="reviewStatus" required>
+                        <option value="APPROVED">批准</option>
+                        <option value="REJECTED">拒绝</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="reviewComment">审核备注:</label>
+                    <textarea id="reviewComment" rows="3" placeholder="请输入审核备注"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeReviewModal()">取消</button>
+                <button class="btn btn-primary" onclick="submitReview()">提交</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 详情对话框 -->
+    <div id="detailModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>预约详情</h3>
+                <span class="close" onclick="closeDetailModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>预约ID:</label>
+                    <input type="text" id="detailId" readonly>
+                </div>
+                <div class="form-group">
+                    <label>用户ID:</label>
+                    <input type="text" id="detailUserId" readonly>
+                </div>
+                <div class="form-group">
+                    <label>器材名称:</label>
+                    <input type="text" id="detailEquipmentName" readonly>
+                </div>
+                <div class="form-group">
+                    <label>预约日期:</label>
+                    <input type="text" id="detailDate" readonly>
+                </div>
+                <div class="form-group">
+                    <label>开始时间:</label>
+                    <input type="text" id="detailStartTime" readonly>
+                </div>
+                <div class="form-group">
+                    <label>结束时间:</label>
+                    <input type="text" id="detailEndTime" readonly>
+                </div>
+                <div class="form-group">
+                    <label>状态:</label>
+                    <input type="text" id="detailStatus" readonly>
+                </div>
+                <div class="form-group">
+                    <label>创建时间:</label>
+                    <input type="text" id="detailCreateTime" readonly>
+                </div>
+                <div class="form-group">
+                    <label>审核备注:</label>
+                    <textarea id="detailComment" rows="3" readonly></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeDetailModal()">关闭</button>
+            </div>
+        </div>
+    </div>
+    
+    <script src="js/lib/axios.min.js"></script>
+    <script>
+        // 全局变量
+        let currentPage = 1;
+        const pageSize = 10;
+        
+        // 页面加载完成后初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            loadReservations();
+        });
+        
+        // 加载预约记录
+        function loadReservations(page = 1) {
+            currentPage = page;
+            
+            // 获取筛选条件
+            const userId = document.getElementById('searchUserId').value;
+            const equipmentId = document.getElementById('searchEquipmentId').value;
+            const status = document.getElementById('searchStatus').value;
+            
+            // 构造查询参数
+            const params = {
+                page: currentPage,
+                size: pageSize
+            };
+            
+            if (userId) params.userId = userId;
+            if (equipmentId) params.equipmentId = equipmentId;
+            if (status) params.status = status;
+            
+            // 发送请求
+            axios.get('/api/equipment-reservations', { params })
+                .then(response => {
+                    const data = response.data;
+                    renderTable(data.content);
+                    renderPagination(data.totalPages, data.number + 1);
+                })
+                .catch(error => {
+                    console.error('加载预约记录失败:', error);
+                    alert('加载预约记录失败');
+                });
+        }
+        
+        // 渲染表格数据
+        function renderTable(reservations) {
+            const tbody = document.getElementById('reservationsTableBody');
+            tbody.innerHTML = '';
+            
+            if (!reservations || reservations.length === 0) {
+                const tr = document.createElement('tr');
+                tr.innerHTML = '<td colspan="9" style="text-align: center;">暂无数据</td>';
+                tbody.appendChild(tr);
+                return;
+            }
+            
+            reservations.forEach(reservation => {
+                const tr = document.createElement('tr');
+                
+                // 格式化状态显示
+                let statusText = '';
+                let statusClass = '';
+                switch (reservation.status) {
+                    case 'PENDING':
+                        statusText = '待审核';
+                        statusClass = 'status-pending';
+                        break;
+                    case 'APPROVED':
+                        statusText = '已批准';
+                        statusClass = 'status-approved';
+                        break;
+                    case 'REJECTED':
+                        statusText = '已拒绝';
+                        statusClass = 'status-rejected';
+                        break;
+                    case 'CANCELLED':
+                        statusText = '已取消';
+                        statusClass = 'status-cancelled';
+                        break;
+                    default:
+                        statusText = reservation.status;
+                }
+                
+                tr.innerHTML = `
+                    <td>${reservation.id}</td>
+                    <td>${reservation.userId}</td>
+                    <td>${reservation.equipmentName || '-'}</td>
+                    <td>${reservation.date}</td>
+                    <td>${reservation.startTime}</td>
+                    <td>${reservation.endTime}</td>
+                    <td class="${statusClass}">${statusText}</td>
+                    <td>${reservation.createTime}</td>
+                    <td class="action-buttons">
+                        <button class="btn btn-secondary" onclick="openDetailModal(${reservation.id})">详情</button>
+                        ${reservation.status === 'PENDING' ? 
+                            `<button class="btn btn-success" onclick="openReviewModal(${reservation.id})">审核</button>` : ''}
+                        <button class="btn btn-danger" onclick="deleteReservation(${reservation.id})">删除</button>
+                    </td>
+                `;
+                
+                tbody.appendChild(tr);
+            });
+        }
+        
+        // 渲染分页控件
+        function renderPagination(totalPages, currentPage) {
+            const pagination = document.getElementById('pagination');
+            pagination.innerHTML = '';
+            
+            if (totalPages <= 1) return;
+            
+            // 上一页按钮
+            if (currentPage > 1) {
+                const prevButton = document.createElement('button');
+                prevButton.className = 'btn btn-secondary';
+                prevButton.textContent = '上一页';
+                prevButton.onclick = () => loadReservations(currentPage - 1);
+                pagination.appendChild(prevButton);
+            }
+            
+            // 页码按钮
+            for (let i = 1; i <= totalPages; i++) {
+                const pageButton = document.createElement('button');
+                pageButton.className = `btn ${i === currentPage ? 'btn-primary' : 'btn-secondary'}`;
+                pageButton.textContent = i;
+                pageButton.onclick = () => loadReservations(i);
+                pagination.appendChild(pageButton);
+            }
+            
+            // 下一页按钮
+            if (currentPage < totalPages) {
+                const nextButton = document.createElement('button');
+                nextButton.className = 'btn btn-secondary';
+                nextButton.textContent = '下一页';
+                nextButton.onclick = () => loadReservations(currentPage + 1);
+                pagination.appendChild(nextButton);
+            }
+        }
+        
+        // 重置筛选条件
+        function resetFilters() {
+            document.getElementById('searchUserId').value = '';
+            document.getElementById('searchEquipmentId').value = '';
+            document.getElementById('searchStatus').value = '';
+            loadReservations();
+        }
+        
+        // 删除预约
+        function deleteReservation(reservationId) {
+            if (!confirm('确定要删除这个预约记录吗？')) {
+                return;
+            }
+            
+            axios.delete(`/api/equipment-reservations/${reservationId}`)
+                .then(response => {
+                    alert('删除成功');
+                    loadReservations(currentPage);
+                })
+                .catch(error => {
+                    console.error('删除失败:', error);
+                    alert('删除失败');
+                });
+        }
+        
+        // 打开审核对话框
+        function openReviewModal(reservationId) {
+            axios.get(`/api/equipment-reservations/${reservationId}`)
+                .then(response => {
+                    const reservation = response.data;
+                    
+                    // 填充审核数据
+                    document.getElementById('reviewReservationId').value = reservation.id;
+                    document.getElementById('reviewId').value = reservation.id;
+                    document.getElementById('reviewUserId').value = reservation.userId;
+                    document.getElementById('reviewEquipmentName').value = reservation.equipmentName || '-';
+                    document.getElementById('reviewDate').value = reservation.date;
+                    document.getElementById('reviewStartTime').value = reservation.startTime;
+                    document.getElementById('reviewEndTime').value = reservation.endTime;
+                    
+                    // 设置默认审核状态
+                    document.getElementById('reviewStatus').value = 'APPROVED';
+                    document.getElementById('reviewComment').value = '';
+                    
+                    // 显示对话框
+                    document.getElementById('reviewModal').style.display = 'block';
+                })
+                .catch(error => {
+                    console.error('获取预约信息失败:', error);
+                    alert('获取预约信息失败');
+                });
+        }
+        
+        // 关闭审核对话框
+        function closeReviewModal() {
+            document.getElementById('reviewModal').style.display = 'none';
+        }
+        
+        // 提交审核
+        function submitReview() {
+            const reservationId = document.getElementById('reviewReservationId').value;
+            const status = document.getElementById('reviewStatus').value;
+            const comment = document.getElementById('reviewComment').value;
+            
+            // 发送审核请求
+            axios.put(`/api/equipment-reservations/${reservationId}/review`, null, {
+                params: {
+                    status: status,
+                    comment: comment
+                }
+            })
+            .then(response => {
+                alert('审核成功');
+                closeReviewModal();
+                loadReservations(currentPage);
+            })
+            .catch(error => {
+                console.error('审核失败:', error);
+                alert('审核失败');
+            });
+        }
+        
+        // 打开详情对话框
+        function openDetailModal(reservationId) {
+            axios.get(`/api/equipment-reservations/${reservationId}`)
+                .then(response => {
+                    const reservation = response.data;
+                    
+                    // 填充详情数据
+                    document.getElementById('detailId').value = reservation.id;
+                    document.getElementById('detailUserId').value = reservation.userId;
+                    document.getElementById('detailEquipmentName').value = reservation.equipmentName || '-';
+                    document.getElementById('detailDate').value = reservation.date;
+                    document.getElementById('detailStartTime').value = reservation.startTime;
+                    document.getElementById('detailEndTime').value = reservation.endTime;
+                    
+                    // 格式化状态显示
+                    let statusText = '';
+                    switch (reservation.status) {
+                        case 'PENDING':
+                            statusText = '待审核';
+                            break;
+                        case 'APPROVED':
+                            statusText = '已批准';
+                            break;
+                        case 'REJECTED':
+                            statusText = '已拒绝';
+                            break;
+                        case 'CANCELLED':
+                            statusText = '已取消';
+                            break;
+                        default:
+                            statusText = reservation.status;
+                    }
+                    document.getElementById('detailStatus').value = statusText;
+                    
+                    document.getElementById('detailCreateTime').value = reservation.createTime;
+                    document.getElementById('detailComment').value = reservation.comment || '';
+                    
+                    // 显示对话框
+                    document.getElementById('detailModal').style.display = 'block';
+                })
+                .catch(error => {
+                    console.error('获取预约详情失败:', error);
+                    alert('获取预约详情失败');
+                });
+        }
+        
+        // 关闭详情对话框
+        function closeDetailModal() {
+            document.getElementById('detailModal').style.display = 'none';
+        }
+        
+        // 点击模态框外部关闭
+        window.onclick = function(event) {
+            const reviewModal = document.getElementById('reviewModal');
+            const detailModal = document.getElementById('detailModal');
+            
+            if (event.target === reviewModal) {
+                closeReviewModal();
+            }
+            
+            if (event.target === detailModal) {
+                closeDetailModal();
+            }
+        }
+    </script>
+</body>
+</html>

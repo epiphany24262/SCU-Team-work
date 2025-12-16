@@ -1,0 +1,18 @@
+/* 用户管理样式 */
+.table-container {
+    background: white;
+    border-radius: 8px;
+    padding: 20px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.search-form {
+    background: #f5f7fa;
+    padding: 20px;
+    margin-bottom: 20px;
+    border-radius: 4px;
+}
+
+.table-operations {
+    margin-bottom: 16px;
+}

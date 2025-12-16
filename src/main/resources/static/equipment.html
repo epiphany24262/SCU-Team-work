@@ -1,0 +1,1398 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>器材管理</title>
+    <link rel="stylesheet" href="css/lib/all.min.css">
+    <link rel="stylesheet" href="css/index.css">
+    <link rel="stylesheet" href="css/equipment.css">
+</head>
+<body>
+<div class="container">
+    <h2><i class="fas fa-dumbbell"></i> 器材管理</h2>
+
+    <!-- 标签页 -->
+    <div class="tabs">
+        <div class="tab active" onclick="switchTab('equipment')">器材管理</div>
+        <div class="tab" onclick="switchTab('reservations')">器材预约管理</div>
+    </div>
+
+    <!-- 器材管理标签页 -->
+    <div id="equipment-tab" class="tab-content active">
+        <!-- 器材筛选区 -->
+        <div class="filter-section">
+            <div class="filter-row">
+                <div class="filter-item">
+                    <label for="searchEquipmentName">器材名称:</label>
+                    <input type="text" id="searchEquipmentName" placeholder="输入器材名称">
+                </div>
+                <div class="filter-item">
+                    <label for="searchEquipmentType">器材类型:</label>
+                    <select id="searchEquipmentType">
+                        <option value="">全部</option>
+                        <option value="有氧器械">有氧器械</option>
+                        <option value="力量器械">力量器械</option>
+                        <option value="辅助器械">辅助器械</option>
+                        <option value="功能器械">功能器械</option>
+                    </select>
+                </div>
+                <div class="filter-item">
+                    <label for="searchEquipmentStatus">状态:</label>
+                    <select id="searchEquipmentStatus">
+                        <option value="">全部</option>
+                        <option value="AVAILABLE">可用</option>
+                        <option value="MAINTENANCE">保养中</option>
+                        <option value="BROKEN">损坏</option>
+                        <option value="UNAVAILABLE">不可用</option>
+                    </select>
+                </div>
+                <div class="filter-item">
+                    <button class="btn btn-primary" onclick="loadEquipment()">
+                        <i class="fas fa-search"></i> 搜索
+                    </button>
+                    <button class="btn btn-secondary" onclick="resetEquipmentFilters()">
+                        <i class="fas fa-sync"></i> 重置
+                    </button>
+                    <button class="btn btn-success" onclick="openAddEquipmentModal()">
+                        <i class="fas fa-plus"></i> 添加器材
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 器材列表 -->
+        <div class="table-container">
+            <table>
+                <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>器材名称</th>
+                    <th>类型</th>
+                    <th>品牌</th>
+                    <th>型号</th>
+                    <th>总数量</th>
+                    <th>可用数量</th>
+                    <th>位置</th>
+                    <th>状态</th>
+                    <th>上次保养</th>
+                    <th>下次保养</th>
+                    <th>操作</th>
+                </tr>
+                </thead>
+                <tbody id="equipmentTableBody">
+                <!-- 数据将通过JavaScript动态加载 -->
+                </tbody>
+            </table>
+        </div>
+
+        <!-- 分页组件 -->
+        <div class="pagination" id="equipmentPagination">
+            <!-- 分页控件将通过JavaScript动态生成 -->
+        </div>
+    </div>
+
+    <!-- 器材预约管理标签页 -->
+    <div id="reservations-tab" class="tab-content">
+        <!-- 预约筛选区 -->
+        <div class="filter-section">
+            <div class="filter-row">
+                <div class="filter-item">
+                    <label for="searchUserName">用户名称:</label>
+                    <input type="text" id="searchUserName" placeholder="请输入用户名称">
+                </div>
+                <div class="filter-item">
+                    <label for="searchReservationEquipmentName">器材名称:</label>
+                    <input type="text" id="searchReservationEquipmentName" placeholder="请输入器材名称">
+                </div>
+                <div class="filter-item">
+                    <label for="searchReservationStatus">状态:</label>
+                    <select id="searchReservationStatus">
+                        <option value="">全部</option>
+                        <option value="PENDING">待审核</option>
+                        <option value="APPROVED">已批准</option>
+                        <option value="REJECTED">已拒绝</option>
+                        <option value="CANCELLED">已取消</option>
+                        <option value="COMPLETED">已完成</option>
+                    </select>
+                </div>
+                <div class="filter-item">
+                    <button class="btn btn-primary" onclick="loadReservations()">
+                        <i class="fas fa-search"></i> 搜索
+                    </button>
+                    <button class="btn btn-secondary" onclick="resetReservationFilters()">
+                        <i class="fas fa-sync"></i> 重置
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 预约列表 -->
+        <div class="table-container">
+            <table>
+                <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>用户名称</th>
+                    <th>器材名称</th>
+                    <th>预约日期</th>
+                    <th>开始时间</th>
+                    <th>结束时间</th>
+                    <th>数量</th>
+                    <th>使用目的</th>
+                    <th>状态</th>
+                    <th>创建时间</th>
+                    <th>操作</th>
+                </tr>
+                </thead>
+                <tbody id="reservationsTableBody">
+                <!-- 数据将通过JavaScript动态加载 -->
+                </tbody>
+            </table>
+        </div>
+
+        <!-- 分页组件 -->
+        <div class="pagination" id="reservationsPagination">
+            <!-- 分页控件将通过JavaScript动态生成 -->
+        </div>
+    </div>
+</div>
+
+<!-- 审核对话框 -->
+<div id="reviewModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>审核预约</h3>
+            <span class="close" onclick="closeReviewModal()">&times;</span>
+        </div>
+        <div class="modal-body">
+            <input type="hidden" id="reviewReservationId">
+            <div class="form-group">
+                <label>预约ID:</label>
+                <input type="text" id="reviewId" readonly>
+            </div>
+            <div class="form-group">
+                <label>用户ID:</label>
+                <input type="text" id="reviewUserId" readonly>
+            </div>
+            <div class="form-group">
+                <label>器材名称:</label>
+                <input type="text" id="reviewEquipmentName" readonly>
+            </div>
+            <div class="form-group">
+                <label>预约日期:</label>
+                <input type="text" id="reviewDate" readonly>
+            </div>
+            <div class="form-group">
+                <label>开始时间:</label>
+                <input type="text" id="reviewStartTime" readonly>
+            </div>
+            <div class="form-group">
+                <label>结束时间:</label>
+                <input type="text" id="reviewEndTime" readonly>
+            </div>
+            <div class="form-group">
+                <label for="reviewStatus">审核结果:</label>
+                <select id="reviewStatus" required>
+                    <option value="APPROVED">批准</option>
+                    <option value="REJECTED">拒绝</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="reviewComment">审核备注:</label>
+                <textarea id="reviewComment" rows="3" placeholder="请输入审核备注"></textarea>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeReviewModal()">取消</button>
+            <button class="btn btn-primary" onclick="submitReview()">提交</button>
+        </div>
+    </div>
+</div>
+
+<!-- 添加器材对话框 -->
+<div id="addEquipmentModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>添加器材</h3>
+            <span class="close" onclick="closeAddEquipmentModal()">&times;</span>
+        </div>
+        <div class="modal-body">
+            <div class="form-group">
+                <label for="addName">器材名称:</label>
+                <input type="text" id="addName" required>
+            </div>
+            <div class="form-group">
+                <label for="addType">器材类型:</label>
+                <select id="addType" required>
+                    <option value="">请选择类型</option>
+                    <option value="有氧器械">有氧器械</option>
+                    <option value="力量器械">力量器械</option>
+                    <option value="辅助器械">辅助器械</option>
+                    <option value="功能器械">功能器械</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="addBrand">品牌:</label>
+                <input type="text" id="addBrand" required>
+            </div>
+            <div class="form-group">
+                <label for="addModel">型号:</label>
+                <input type="text" id="addModel" required>
+            </div>
+            <div class="form-group">
+                <label for="addQuantity">总数量:</label>
+                <input type="number" id="addQuantity" min="1" required>
+            </div>
+            <div class="form-group">
+                <label for="addAvailableQuantity">可用数量:</label>
+                <input type="number" id="addAvailableQuantity" min="0" required>
+            </div>
+            <div class="form-group">
+                <label for="addLocation">位置:</label>
+                <input type="text" id="addLocation" required>
+            </div>
+            <div class="form-group">
+                <label for="addDescription">描述:</label>
+                <textarea id="addDescription" rows="3"></textarea>
+            </div>
+            <div class="form-group">
+                <label for="addSpecifications">规格参数:</label>
+                <textarea id="addSpecifications" rows="3"></textarea>
+            </div>
+            <div class="form-group">
+                <label for="addStatus">状态:</label>
+                <select id="addStatus" required>
+                    <option value="AVAILABLE">可用</option>
+                    <option value="MAINTENANCE">保养中</option>
+                    <option value="BROKEN">损坏</option>
+                    <option value="UNAVAILABLE">不可用</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="addMaintenanceDate">上次保养日期:</label>
+                <input type="date" id="addMaintenanceDate">
+            </div>
+            <div class="form-group">
+                <label for="addNextMaintenanceDate">下次保养日期:</label>
+                <input type="date" id="addNextMaintenanceDate">
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeAddEquipmentModal()">取消</button>
+            <button class="btn btn-primary" onclick="submitAddEquipment()">添加</button>
+        </div>
+    </div>
+</div>
+
+<!-- 编辑器材对话框 -->
+<div id="editEquipmentModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>编辑器材</h3>
+            <span class="close" onclick="closeEditEquipmentModal()">&times;</span>
+        </div>
+        <div class="modal-body">
+            <input type="hidden" id="editId">
+            <div class="form-group">
+                <label for="editName">器材名称:</label>
+                <input type="text" id="editName" required>
+            </div>
+            <div class="form-group">
+                <label for="editType">器材类型:</label>
+                <select id="editType" required>
+                    <option value="">请选择类型</option>
+                    <option value="有氧器械">有氧器械</option>
+                    <option value="力量器械">力量器械</option>
+                    <option value="辅助器械">辅助器械</option>
+                    <option value="功能器械">功能器械</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="editBrand">品牌:</label>
+                <input type="text" id="editBrand" required>
+            </div>
+            <div class="form-group">
+                <label for="editModel">型号:</label>
+                <input type="text" id="editModel" required>
+            </div>
+            <div class="form-group">
+                <label for="editQuantity">总数量:</label>
+                <input type="number" id="editQuantity" min="1" required>
+            </div>
+            <div class="form-group">
+                <label for="editAvailableQuantity">可用数量:</label>
+                <input type="number" id="editAvailableQuantity" min="0" required>
+            </div>
+            <div class="form-group">
+                <label for="editLocation">位置:</label>
+                <input type="text" id="editLocation" required>
+            </div>
+            <div class="form-group">
+                <label for="editDescription">描述:</label>
+                <textarea id="editDescription" rows="3"></textarea>
+            </div>
+            <div class="form-group">
+                <label for="editSpecifications">规格参数:</label>
+                <textarea id="editSpecifications" rows="3"></textarea>
+            </div>
+            <div class="form-group">
+                <label for="editStatus">状态:</label>
+                <select id="editStatus" required>
+                    <option value="AVAILABLE">可用</option>
+                    <option value="MAINTENANCE">保养中</option>
+                    <option value="BROKEN">损坏</option>
+                    <option value="UNAVAILABLE">不可用</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="editMaintenanceDate">上次保养日期:</label>
+                <input type="date" id="editMaintenanceDate">
+            </div>
+            <div class="form-group">
+                <label for="editNextMaintenanceDate">下次保养日期:</label>
+                <input type="date" id="editNextMaintenanceDate">
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeEditEquipmentModal()">取消</button>
+            <button class="btn btn-primary" onclick="submitEditEquipment()">保存</button>
+        </div>
+    </div>
+</div>
+
+<!-- 器材详情对话框 -->
+<div id="equipmentDetailModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>器材详情</h3>
+            <span class="close" onclick="closeEquipmentDetailModal()">&times;</span>
+        </div>
+        <div class="modal-body">
+            <div class="form-group">
+                <label>器材ID:</label>
+                <input type="text" id="detailEquipmentId" readonly>
+            </div>
+            <div class="form-group">
+                <label>器材名称:</label>
+                <input type="text" id="detailEquipmentName" readonly>
+            </div>
+            <div class="form-group">
+                <label>类型:</label>
+                <input type="text" id="detailEquipmentType" readonly>
+            </div>
+            <div class="form-group">
+                <label>品牌:</label>
+                <input type="text" id="detailEquipmentBrand" readonly>
+            </div>
+            <div class="form-group">
+                <label>型号:</label>
+                <input type="text" id="detailEquipmentModel" readonly>
+            </div>
+            <div class="form-group">
+                <label>总数量:</label>
+                <input type="text" id="detailEquipmentQuantity" readonly>
+            </div>
+            <div class="form-group">
+                <label>可用数量:</label>
+                <input type="text" id="detailEquipmentAvailableQuantity" readonly>
+            </div>
+            <div class="form-group">
+                <label>位置:</label>
+                <input type="text" id="detailEquipmentLocation" readonly>
+            </div>
+            <div class="form-group">
+                <label>描述:</label>
+                <textarea id="detailEquipmentDescription" rows="3" readonly></textarea>
+            </div>
+            <div class="form-group">
+                <label>规格参数:</label>
+                <textarea id="detailEquipmentSpecifications" rows="3" readonly></textarea>
+            </div>
+            <div class="form-group">
+                <label>状态:</label>
+                <input type="text" id="detailEquipmentStatus" readonly>
+            </div>
+            <div class="form-group">
+                <label>上次保养:</label>
+                <input type="text" id="detailEquipmentMaintenanceDate" readonly>
+            </div>
+            <div class="form-group">
+                <label>下次保养:</label>
+                <input type="text" id="detailEquipmentNextMaintenanceDate" readonly>
+            </div>
+            <div class="form-group">
+                <label>创建时间:</label>
+                <input type="text" id="detailEquipmentCreatedAt" readonly>
+            </div>
+            <div class="form-group">
+                <label>更新时间:</label>
+                <input type="text" id="detailEquipmentUpdatedAt" readonly>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeEquipmentDetailModal()">关闭</button>
+        </div>
+    </div>
+</div>
+
+<!-- 详情对话框 -->
+<div id="detailModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>预约详情</h3>
+            <span class="close" onclick="closeDetailModal()">&times;</span>
+        </div>
+        <div class="modal-body">
+            <div class="form-group">
+                <label>预约ID:</label>
+                <input type="text" id="detailId" readonly>
+            </div>
+            <div class="form-group">
+                <label>用户ID:</label>
+                <input type="text" id="detailUserId" readonly>
+            </div>
+            <div class="form-group">
+                <label>器材名称:</label>
+                <input type="text" id="detailEquipmentName" readonly>
+            </div>
+            <div class="form-group">
+                <label>预约日期:</label>
+                <input type="text" id="detailDate" readonly>
+            </div>
+            <div class="form-group">
+                <label>开始时间:</label>
+                <input type="text" id="detailStartTime" readonly>
+            </div>
+            <div class="form-group">
+                <label>结束时间:</label>
+                <input type="text" id="detailEndTime" readonly>
+            </div>
+            <div class="form-group">
+                <label>状态:</label>
+                <input type="text" id="detailStatus" readonly>
+            </div>
+            <div class="form-group">
+                <label>创建时间:</label>
+                <input type="text" id="detailCreateTime" readonly>
+            </div>
+            <div class="form-group">
+                <label>审核备注:</label>
+                <textarea id="detailComment" rows="3" readonly></textarea>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeDetailModal()">关闭</button>
+        </div>
+    </div>
+</div>
+
+<script src="js/lib/axios.min.js"></script>
+<script>
+    // 全局变量
+    let currentPage = 1;
+    let currentEquipmentPage = 1;
+    const pageSize = 10;
+
+    // 获取当前用户ID（管理员）
+    function getCurrentUserId() {
+        // 这里需要根据实际登录系统获取当前管理员ID
+        // 暂时返回1作为示例
+        return 1;
+    }
+
+    // 页面加载完成后初始化
+    document.addEventListener('DOMContentLoaded', function() {
+        loadEquipment();
+        loadEquipmentTypes(); // 动态加载器材类型
+    });
+
+    // 切换标签页
+    function switchTab(tabName) {
+        // 隐藏所有标签页内容
+        document.querySelectorAll('.tab-content').forEach(tab => {
+            tab.classList.remove('active');
+        });
+
+        // 移除所有标签页的active类
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.classList.remove('active');
+        });
+
+        // 显示选中的标签页内容
+        document.getElementById(tabName + '-tab').classList.add('active');
+
+        // 设置选中的标签页为active
+        event.target.classList.add('active');
+
+        // 根据标签页加载相应数据
+        if (tabName === 'equipment') {
+            loadEquipment();
+        } else if (tabName === 'reservations') {
+            loadReservations();
+        }
+    }
+
+    // 动态加载器材类型
+    function loadEquipmentTypes() {
+        axios.get('/api/equipment')
+            .then(response => {
+                const data = response.data;
+                const equipmentList = data.content || data.data || [];
+
+                // 从器材列表中提取唯一的类型
+                const types = [...new Set(equipmentList.map(eq => eq.type).filter(type => type))];
+
+                // 更新类型下拉框
+                const typeSelect = document.getElementById('searchEquipmentType');
+                const currentValue = typeSelect.value;
+
+                // 清空现有选项（保留"全部"选项）
+                typeSelect.innerHTML = '<option value="">全部</option>';
+
+                // 添加数据库中的实际类型
+                types.forEach(type => {
+                    const option = document.createElement('option');
+                    option.value = type;
+                    option.textContent = type;
+                    typeSelect.appendChild(option);
+                });
+
+                // 恢复之前选择的值
+                typeSelect.value = currentValue;
+
+                console.log('加载的器材类型:', types);
+            })
+            .catch(error => {
+                console.error('加载器材类型失败:', error);
+            });
+    }
+
+    // 加载器材列表
+    function loadEquipment(page = 1) {
+        currentEquipmentPage = page;
+
+        const name = document.getElementById('searchEquipmentName').value;
+        const type = document.getElementById('searchEquipmentType').value;
+        const status = document.getElementById('searchEquipmentStatus').value;
+
+        const params = {
+            page: currentEquipmentPage,
+            pageSize: pageSize
+        };
+
+        if (name) {
+            params.keyword = name;
+        }
+        if (type) {
+            params.type = type;
+        }
+        if (status) {
+            params.status = status;
+        }
+
+        console.log('搜索参数:', params);
+        console.log('请求URL:', '/api/equipment', '参数:', params);
+
+        axios.get('/api/equipment', { params })
+            .then(response => {
+                console.log('搜索响应数据:', response.data);
+                const data = response.data;
+                renderEquipmentTable(data.content || data.data || []);
+                renderEquipmentPagination(data, 'equipmentPagination', loadEquipment);
+            })
+            .catch(error => {
+                console.error('加载器材列表失败:', error);
+                if (error.response) {
+                    console.error('错误响应数据:', error.response.data);
+                    alert('加载器材列表失败: ' + (error.response.data.message || error.response.status));
+                } else {
+                    alert('加载器材列表失败，请检查网络连接');
+                }
+            });
+    }
+
+    // 渲染器材表格数据
+    function renderEquipmentTable(equipmentList) {
+        const tbody = document.getElementById('equipmentTableBody');
+        tbody.innerHTML = '';
+
+        if (!equipmentList || equipmentList.length === 0) {
+            const tr = document.createElement('tr');
+            tr.innerHTML = '<td colspan="12" style="text-align: center;">暂无器材数据</td>';
+            tbody.appendChild(tr);
+            return;
+        }
+
+        equipmentList.forEach(equipment => {
+            const tr = document.createElement('tr');
+
+            // 设置状态显示样式
+            let statusClass = '';
+            let statusText = '';
+            switch(equipment.status) {
+                case 'AVAILABLE':
+                    statusClass = 'status-available';
+                    statusText = '可用';
+                    break;
+                case 'MAINTENANCE':
+                    statusClass = 'status-maintenance';
+                    statusText = '保养中';
+                    break;
+                case 'BROKEN':
+                    statusClass = 'status-broken';
+                    statusText = '损坏';
+                    break;
+                case 'UNAVAILABLE':
+                    statusClass = 'status-unavailable';
+                    statusText = '不可用';
+                    break;
+                default:
+                    statusClass = 'status-unavailable';
+                    statusText = equipment.status;
+            }
+
+            tr.innerHTML = `
+                <td>${equipment.id}</td>
+                <td>${equipment.name || '未知器材'}</td>
+                <td>${equipment.type || '-'}</td>
+                <td>${equipment.brand || '-'}</td>
+                <td>${equipment.model || '-'}</td>
+                <td>${equipment.quantity || 0}</td>
+                <td>${equipment.available_quantity || equipment.availableQuantity || 0}</td>
+                <td>${equipment.location || '-'}</td>
+                <td class="${statusClass}">${statusText}</td>
+                <td>${equipment.maintenance_date || equipment.maintenanceDate || '-'}</td>
+                <td>${equipment.next_maintenance_date || equipment.nextMaintenanceDate || '-'}</td>
+                <td class="action-buttons">
+                    <button class="btn btn-secondary" onclick="openEquipmentDetailModal(${equipment.id})">详情</button>
+                    <button class="btn btn-warning" onclick="openEditEquipmentModal(${equipment.id})">编辑</button>
+                    <button class="btn btn-danger" onclick="deleteEquipment(${equipment.id})">删除</button>
+                </td>
+            `;
+
+            tbody.appendChild(tr);
+        });
+    }
+
+    // 渲染器材分页控件
+    function renderEquipmentPagination(data, paginationId, loadFunction) {
+        const pagination = document.getElementById(paginationId);
+        pagination.innerHTML = '';
+
+        let totalPages = 1;
+        let currentPage = 1;
+
+        // 处理不同的响应格式
+        if (data.totalPages !== undefined) {
+            totalPages = data.totalPages;
+            currentPage = data.number !== undefined ? data.number + 1 : 1;
+        } else if (data.totalPages !== undefined) {
+            totalPages = data.totalPages;
+            currentPage = data.currentPage || 1;
+        } else {
+            totalPages = 1;
+            currentPage = 1;
+        }
+
+        // 更新全局当前页码变量
+        currentEquipmentPage = currentPage;
+
+        if (totalPages <= 1) return;
+
+        // 上一页按钮
+        if (currentPage > 1) {
+            const prevButton = document.createElement('button');
+            prevButton.className = 'btn btn-secondary';
+            prevButton.textContent = '上一页';
+            prevButton.onclick = () => loadFunction(currentPage - 1);
+            pagination.appendChild(prevButton);
+        }
+
+        // 页码按钮
+        for (let i = 1; i <= totalPages; i++) {
+            const pageButton = document.createElement('button');
+            pageButton.className = `btn ${i === currentPage ? 'btn-primary' : 'btn-secondary'}`;
+            pageButton.textContent = i;
+            pageButton.onclick = () => loadFunction(i);
+            pagination.appendChild(pageButton);
+        }
+
+        // 下一页按钮
+        if (currentPage < totalPages) {
+            const nextButton = document.createElement('button');
+            nextButton.className = 'btn btn-secondary';
+            nextButton.textContent = '下一页';
+            nextButton.onclick = () => loadFunction(currentPage + 1);
+            pagination.appendChild(nextButton);
+        }
+    }
+
+    // 重置预约筛选条件
+    function resetReservationFilters() {
+        document.getElementById('searchUserName').value = '';
+        document.getElementById('searchReservationEquipmentName').value = '';
+        document.getElementById('searchReservationStatus').value = '';
+        loadReservations(1);
+    }
+
+    // 加载预约记录
+    function loadReservations(page = 1) {
+        currentPage = page;
+
+        // 获取筛选条件
+        const userName = document.getElementById('searchUserName').value;
+        const equipmentName = document.getElementById('searchReservationEquipmentName').value;
+        const status = document.getElementById('searchReservationStatus').value;
+
+        // 构造查询参数 - 与后端API接口匹配
+        const params = {
+            page: currentPage, // 后端使用1-based页码
+            pageSize: pageSize
+        };
+
+        // 将用户名称和器材名称合并为keyword参数（后端支持模糊搜索）
+        let keyword = '';
+        if (userName) keyword += `${userName} `;
+        if (equipmentName) keyword += `${equipmentName}`;
+        if (keyword.trim()) params.keyword = keyword.trim();
+
+        if (status) params.status = status;
+
+        console.log('发送请求到 /api/equipment-reservations，参数:', params);
+
+        // 发送请求
+        axios.get('/api/equipment-reservations', { params })
+            .then(response => {
+                console.log('API响应数据:', response.data);
+                const data = response.data;
+
+                // 处理不同的响应格式
+                if (data.content) {
+                    // Spring Data JPA分页格式
+                    renderTable(data.content);
+                    renderPagination(data.totalPages, data.number + 1);
+                } else if (Array.isArray(data)) {
+                    // 直接数组格式
+                    renderTable(data);
+                    renderPagination(1, 1);
+                } else if (data.data && Array.isArray(data.data)) {
+                    // 自定义响应格式
+                    renderTable(data.data);
+                    renderPagination(data.totalPages || 1, data.currentPage || 1);
+                } else {
+                    console.error('未知的响应格式:', data);
+                    alert('无法解析响应数据');
+                }
+            })
+            .catch(error => {
+                console.error('加载预约记录失败:', error);
+                if (error.response) {
+                    console.error('错误响应:', error.response.data);
+                    alert('加载预约记录失败: ' + (error.response.data.message || error.response.status));
+                } else {
+                    alert('加载预约记录失败，请检查网络连接');
+                }
+            });
+    }
+
+    // 渲染表格数据
+    function renderTable(reservations) {
+        const tbody = document.getElementById('reservationsTableBody');
+        tbody.innerHTML = '';
+
+        if (!reservations || reservations.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="11" class="text-center">暂无预约记录</td></tr>';
+            return;
+        }
+
+        reservations.forEach(reservation => {
+            const row = document.createElement('tr');
+
+            // 格式化时间 - 根据数据库表结构处理
+            const reservationDate = reservation.reservationDate || reservation.date || '-';
+            const startTime = reservation.startTime || '-';
+            const endTime = reservation.endTime || '-';
+            const createdAt = reservation.createdAt || reservation.createTime || '-';
+
+            // 格式化显示时间
+            const displayDate = reservationDate !== '-' ? new Date(reservationDate).toLocaleDateString() : '-';
+            const displayStartTime = startTime !== '-' ? startTime.substring(0, 5) : '-';
+            const displayEndTime = endTime !== '-' ? endTime.substring(0, 5) : '-';
+            const displayCreatedAt = createdAt !== '-' ? new Date(createdAt).toLocaleString() : '-';
+
+            // 状态中文显示
+            let statusText = '';
+            let statusClass = '';
+            switch(reservation.status) {
+                case 'PENDING':
+                    statusText = '待审核';
+                    statusClass = 'status-pending';
+                    break;
+                case 'APPROVED':
+                    statusText = '已批准';
+                    statusClass = 'status-approved';
+                    break;
+                case 'REJECTED':
+                    statusText = '已拒绝';
+                    statusClass = 'status-rejected';
+                    break;
+                case 'CANCELLED':
+                    statusText = '已取消';
+                    statusClass = 'status-cancelled';
+                    break;
+                case 'COMPLETED':
+                    statusText = '已完成';
+                    statusClass = 'status-completed';
+                    break;
+                case 'EXPIRED':
+                    statusText = '已过期';
+                    statusClass = 'status-expired';
+                    break;
+                default:
+                    statusText = reservation.status || '待审核';
+                    statusClass = 'status-pending';
+            }
+
+            row.innerHTML = `
+                <td>${reservation.id || '-'}</td>
+                <td>${reservation.userName || reservation.userId || '-'}</td>
+                <td>${reservation.equipmentName || '-'}</td>
+                <td>${displayDate}</td>
+                <td>${displayStartTime}</td>
+                <td>${displayEndTime}</td>
+                <td>${reservation.quantity || 1}</td>
+                <td>${reservation.purpose || reservation.reason || '-'}</td>
+                <td><span class="${statusClass}">${statusText}</span></td>
+                <td>${displayCreatedAt}</td>
+                <td>
+                    <button class="btn btn-primary btn-sm" onclick="${reservation.status === 'PENDING' ? 'openReviewModal' : 'openDetailModal'}(${reservation.id})">
+                        ${reservation.status === 'PENDING' ? '审核' : '查看'}
+                    </button>
+                    <button class="btn btn-danger btn-sm" onclick="deleteReservation(${reservation.id})">删除</button>
+                </td>
+            `;
+
+            tbody.appendChild(row);
+        });
+    }
+
+    // 渲染分页控件
+    function renderPagination(totalPages, page) {
+        const pagination = document.getElementById('reservationsPagination');
+        if (!pagination) {
+            console.error('分页组件未找到: reservationsPagination');
+            return;
+        }
+        pagination.innerHTML = '';
+
+        // 更新全局当前页码变量
+        currentPage = page;
+
+        if (totalPages <= 1) return;
+
+        // 上一页按钮
+        if (currentPage > 1) {
+            const prevButton = document.createElement('button');
+            prevButton.className = 'btn btn-secondary';
+            prevButton.textContent = '上一页';
+            prevButton.onclick = () => loadReservations(currentPage - 1);
+            pagination.appendChild(prevButton);
+        }
+
+        // 页码按钮
+        for (let i = 1; i <= totalPages; i++) {
+            const pageButton = document.createElement('button');
+            pageButton.className = `btn ${i === currentPage ? 'btn-primary' : 'btn-secondary'}`;
+            pageButton.textContent = i;
+            pageButton.onclick = () => loadReservations(i);
+            pagination.appendChild(pageButton);
+        }
+
+        // 下一页按钮
+        if (currentPage < totalPages) {
+            const nextButton = document.createElement('button');
+            nextButton.className = 'btn btn-secondary';
+            nextButton.textContent = '下一页';
+            nextButton.onclick = () => loadReservations(currentPage + 1);
+            pagination.appendChild(nextButton);
+        }
+    }
+
+    // 重置筛选条件
+    function resetFilters() {
+        document.getElementById('searchUserName').value = '';
+        document.getElementById('searchEquipmentName').value = '';
+        document.getElementById('searchStatus').value = '';
+        loadReservations(1);
+    }
+
+    // 重置器材筛选条件
+    function resetEquipmentFilters() {
+        document.getElementById('searchEquipmentName').value = '';
+        document.getElementById('searchEquipmentType').value = '';
+        document.getElementById('searchEquipmentStatus').value = '';
+        loadEquipment(1);
+    }
+
+    // 打开添加器材对话框
+    function openAddEquipmentModal() {
+        // 清空表单
+        document.getElementById('addName').value = '';
+        document.getElementById('addType').value = '';
+        document.getElementById('addBrand').value = '';
+        document.getElementById('addModel').value = '';
+        document.getElementById('addQuantity').value = 1;
+        document.getElementById('addAvailableQuantity').value = 1;
+        document.getElementById('addLocation').value = '';
+        document.getElementById('addDescription').value = '';
+        document.getElementById('addSpecifications').value = '';
+        document.getElementById('addStatus').value = 'AVAILABLE';
+        document.getElementById('addMaintenanceDate').value = '';
+        document.getElementById('addNextMaintenanceDate').value = '';
+
+        document.getElementById('addEquipmentModal').style.display = 'block';
+    }
+
+    // 关闭添加器材对话框
+    function closeAddEquipmentModal() {
+        document.getElementById('addEquipmentModal').style.display = 'none';
+    }
+
+    // 提交添加器材
+    function submitAddEquipment() {
+        const equipmentData = {
+            name: document.getElementById('addName').value,
+            type: document.getElementById('addType').value,
+            brand: document.getElementById('addBrand').value,
+            model: document.getElementById('addModel').value,
+            quantity: parseInt(document.getElementById('addQuantity').value),
+            available_quantity: parseInt(document.getElementById('addAvailableQuantity').value),
+            location: document.getElementById('addLocation').value,
+            description: document.getElementById('addDescription').value,
+            specifications: document.getElementById('addSpecifications').value,
+            status: document.getElementById('addStatus').value,
+            maintenance_date: document.getElementById('addMaintenanceDate').value || null,
+            next_maintenance_date: document.getElementById('addNextMaintenanceDate').value || null
+        };
+
+        // 验证数据
+        if (!equipmentData.name || !equipmentData.type || !equipmentData.brand || !equipmentData.model) {
+            alert('请填写完整的器材信息');
+            return;
+        }
+
+        if (equipmentData.available_quantity > equipmentData.quantity) {
+            alert('可用数量不能大于总数量');
+            return;
+        }
+
+        console.log('提交器材数据:', equipmentData);
+
+        axios.post('/api/equipment', equipmentData)
+            .then(response => {
+                alert('器材添加成功');
+                closeAddEquipmentModal();
+                loadEquipment(currentEquipmentPage);
+            })
+            .catch(error => {
+                console.error('添加器材失败:', error);
+                if (error.response) {
+                    alert('添加器材失败: ' + (error.response.data.message || error.response.status));
+                } else {
+                    alert('添加器材失败，请检查网络连接');
+                }
+            });
+    }
+
+    // 打开编辑器材对话框
+    function openEditEquipmentModal(equipmentId) {
+        axios.get(`/api/equipment/${equipmentId}`)
+            .then(response => {
+                const equipment = response.data;
+                let equipmentData = equipment;
+                if (equipment.data) {
+                    equipmentData = equipment.data;
+                }
+
+                // 填充表单数据
+                document.getElementById('editId').value = equipmentData.id;
+                document.getElementById('editName').value = equipmentData.name || '';
+                document.getElementById('editType').value = equipmentData.type || '';
+                document.getElementById('editBrand').value = equipmentData.brand || '';
+                document.getElementById('editModel').value = equipmentData.model || '';
+                document.getElementById('editQuantity').value = equipmentData.quantity || 1;
+                document.getElementById('editAvailableQuantity').value = equipmentData.available_quantity || equipmentData.availableQuantity || 1;
+                document.getElementById('editLocation').value = equipmentData.location || '';
+                document.getElementById('editDescription').value = equipmentData.description || '';
+                document.getElementById('editSpecifications').value = equipmentData.specifications || '';
+                document.getElementById('editStatus').value = equipmentData.status || 'AVAILABLE';
+                document.getElementById('editMaintenanceDate').value = equipmentData.maintenance_date || equipmentData.maintenanceDate || '';
+                document.getElementById('editNextMaintenanceDate').value = equipmentData.next_maintenance_date || equipmentData.nextMaintenanceDate || '';
+
+                document.getElementById('editEquipmentModal').style.display = 'block';
+            })
+            .catch(error => {
+                console.error('获取器材详情失败:', error);
+                alert('获取器材详情失败');
+            });
+    }
+
+    // 关闭编辑器材对话框
+    function closeEditEquipmentModal() {
+        document.getElementById('editEquipmentModal').style.display = 'none';
+    }
+
+    // 提交编辑器材
+    function submitEditEquipment() {
+        const equipmentId = document.getElementById('editId').value;
+
+        // 确保available_quantity有默认值，不能为null
+        const availableQuantityInput = document.getElementById('editAvailableQuantity').value;
+        const availableQuantity = availableQuantityInput ? parseInt(availableQuantityInput) : 0;
+
+        const equipmentData = {
+            name: document.getElementById('editName').value,
+            type: document.getElementById('editType').value,
+            brand: document.getElementById('editBrand').value,
+            model: document.getElementById('editModel').value,
+            quantity: parseInt(document.getElementById('editQuantity').value),
+            availableQuantity: availableQuantity,
+            location: document.getElementById('editLocation').value,
+            description: document.getElementById('editDescription').value,
+            specifications: document.getElementById('editSpecifications').value,
+            status: document.getElementById('editStatus').value,
+            maintenanceDate: document.getElementById('editMaintenanceDate').value || null,
+            nextMaintenanceDate: document.getElementById('editNextMaintenanceDate').value || null
+        };
+
+        // 验证数据
+        if (!equipmentData.name || !equipmentData.type || !equipmentData.brand || !equipmentData.model) {
+            alert('请填写完整的器材信息');
+            return;
+        }
+
+        if (equipmentData.available_quantity > equipmentData.quantity) {
+            alert('可用数量不能大于总数量');
+            return;
+        }
+
+        console.log('提交器材编辑数据:', equipmentData);
+        console.log('请求URL:', `/api/equipment/${equipmentId}`);
+        console.log('available_quantity字段值:', equipmentData.available_quantity);
+        console.log('available_quantity字段类型:', typeof equipmentData.available_quantity);
+
+        axios.put(`/api/equipment/${equipmentId}`, equipmentData)
+            .then(response => {
+                console.log('更新器材成功响应:', response.data);
+
+                // 检查响应格式
+                if (response.data.success === false) {
+                    alert('更新器材失败: ' + (response.data.message || '未知错误'));
+                    return;
+                }
+
+                alert('器材更新成功');
+                closeEditEquipmentModal();
+                loadEquipment(currentEquipmentPage);
+            })
+            .catch(error => {
+                console.error('更新器材失败:', error);
+                if (error.response) {
+                    console.error('错误响应数据:', error.response.data);
+                    console.error('错误状态码:', error.response.status);
+                    console.error('错误头信息:', error.response.headers);
+
+                    let errorMessage = '更新器材失败';
+                    if (error.response.data) {
+                        if (typeof error.response.data === 'string') {
+                            errorMessage += ': ' + error.response.data;
+                        } else if (error.response.data.message) {
+                            errorMessage += ': ' + error.response.data.message;
+                        } else if (error.response.data.error) {
+                            errorMessage += ': ' + error.response.data.error;
+                        } else {
+                            errorMessage += ' (状态码: ' + error.response.status + ')';
+                        }
+                    }
+                    alert(errorMessage);
+                } else if (error.request) {
+                    alert('更新器材失败: 无法连接到服务器，请检查网络连接');
+                } else {
+                    alert('更新器材失败: ' + error.message);
+                }
+            });
+    }
+
+    // 打开器材详情对话框
+    function openEquipmentDetailModal(equipmentId) {
+        axios.get(`/api/equipment/${equipmentId}`)
+            .then(response => {
+                const equipment = response.data;
+                let equipmentData = equipment;
+                if (equipment.data) {
+                    equipmentData = equipment.data;
+                }
+
+                // 格式化状态显示
+                let statusText = '';
+                switch(equipmentData.status) {
+                    case 'AVAILABLE':
+                        statusText = '可用';
+                        break;
+                    case 'MAINTENANCE':
+                        statusText = '保养中';
+                        break;
+                    case 'BROKEN':
+                        statusText = '损坏';
+                        break;
+                    case 'UNAVAILABLE':
+                        statusText = '不可用';
+                        break;
+                    default:
+                        statusText = equipmentData.status;
+                }
+
+                // 填充详情数据
+                document.getElementById('detailEquipmentId').value = equipmentData.id;
+                document.getElementById('detailEquipmentName').value = equipmentData.name || '-';
+                document.getElementById('detailEquipmentType').value = equipmentData.type || '-';
+                document.getElementById('detailEquipmentBrand').value = equipmentData.brand || '-';
+                document.getElementById('detailEquipmentModel').value = equipmentData.model || '-';
+                document.getElementById('detailEquipmentQuantity').value = equipmentData.quantity || 0;
+                document.getElementById('detailEquipmentAvailableQuantity').value = equipmentData.available_quantity || equipmentData.availableQuantity || 0;
+                document.getElementById('detailEquipmentLocation').value = equipmentData.location || '-';
+                document.getElementById('detailEquipmentDescription').value = equipmentData.description || '-';
+                document.getElementById('detailEquipmentSpecifications').value = equipmentData.specifications || '-';
+                document.getElementById('detailEquipmentStatus').value = statusText;
+                document.getElementById('detailEquipmentMaintenanceDate').value = equipmentData.maintenance_date || equipmentData.maintenanceDate || '-';
+                document.getElementById('detailEquipmentNextMaintenanceDate').value = equipmentData.next_maintenance_date || equipmentData.nextMaintenanceDate || '-';
+                document.getElementById('detailEquipmentCreatedAt').value = equipmentData.created_at || equipmentData.createdAt || '-';
+                document.getElementById('detailEquipmentUpdatedAt').value = equipmentData.updated_at || equipmentData.updatedAt || '-';
+
+                document.getElementById('equipmentDetailModal').style.display = 'block';
+            })
+            .catch(error => {
+                console.error('获取器材详情失败:', error);
+                alert('获取器材详情失败');
+            });
+    }
+
+    // 关闭器材详情对话框
+    function closeEquipmentDetailModal() {
+        document.getElementById('equipmentDetailModal').style.display = 'none';
+    }
+
+    // 删除器材
+    function deleteEquipment(equipmentId) {
+        if (!confirm('确定要删除这个器材吗？此操作不可恢复！')) {
+            return;
+        }
+
+        axios.delete(`/api/equipment/${equipmentId}`)
+            .then(response => {
+                alert('删除成功');
+                loadEquipment(currentEquipmentPage);
+            })
+            .catch(error => {
+                console.error('删除失败:', error);
+                alert('删除失败');
+            });
+    }
+
+    // 删除预约
+    function deleteReservation(reservationId) {
+        if (!confirm('确定要删除这个预约记录吗？')) {
+            return;
+        }
+
+        axios.delete(`/api/equipment-reservations/${reservationId}`)
+            .then(response => {
+                alert('删除成功');
+                loadReservations(currentPage);
+            })
+            .catch(error => {
+                console.error('删除失败:', error);
+                alert('删除失败');
+            });
+    }
+
+    // 打开审核对话框
+    function openReviewModal(reservationId) {
+        console.log('打开审核对话框，预约ID:', reservationId);
+
+        axios.get(`/api/equipment-reservations/${reservationId}`)
+            .then(response => {
+                console.log('获取预约详情响应:', response.data);
+                const reservation = response.data;
+
+                // 处理不同的响应格式
+                let reservationData = reservation;
+                if (reservation.data) {
+                    reservationData = reservation.data; // 处理包含data字段的响应
+                }
+
+                // 填充审核数据
+                document.getElementById('reviewReservationId').value = reservationData.id || reservationData.reservationId;
+                document.getElementById('reviewId').value = reservationData.id || reservationData.reservationId;
+                document.getElementById('reviewUserId').value = reservationData.userId;
+                document.getElementById('reviewEquipmentName').value = reservationData.equipmentName || '-';
+
+                // 格式化时间显示
+                const reservationDate = reservationData.reservationDate || reservationData.date;
+                const startTime = reservationData.startTime;
+                const endTime = reservationData.endTime;
+
+                document.getElementById('reviewDate').value = reservationDate ? new Date(reservationDate).toLocaleDateString() : '-';
+                document.getElementById('reviewStartTime').value = startTime ? startTime.substring(0, 5) : '-';
+                document.getElementById('reviewEndTime').value = endTime ? endTime.substring(0, 5) : '-';
+
+                // 设置默认审核状态
+                document.getElementById('reviewStatus').value = 'APPROVED';
+                document.getElementById('reviewComment').value = '';
+
+                // 显示对话框
+                document.getElementById('reviewModal').style.display = 'block';
+
+                console.log('审核对话框已打开，预约ID:', document.getElementById('reviewReservationId').value);
+            })
+            .catch(error => {
+                console.error('获取预约信息失败:', error);
+                if (error.response) {
+                    alert('获取预约信息失败: ' + (error.response.data.message || error.response.status));
+                } else {
+                    alert('获取预约信息失败，请检查网络连接');
+                }
+            });
+    }
+
+    // 关闭审核对话框
+    function closeReviewModal() {
+        document.getElementById('reviewModal').style.display = 'none';
+    }
+
+    // 提交审核
+    function submitReview() {
+        const reservationId = document.getElementById('reviewReservationId').value;
+        const status = document.getElementById('reviewStatus').value;
+        const comment = document.getElementById('reviewComment').value;
+        const approvedBy = getCurrentUserId();
+
+        console.log('提交审核，预约ID:', reservationId, '状态:', status, '备注:', comment, '审核人:', approvedBy);
+
+        if (!reservationId || reservationId === 'undefined') {
+            alert('预约ID不能为空');
+            return;
+        }
+
+        // 根据审核状态选择正确的API端点
+        const apiEndpoint = status === 'APPROVED' ? 'approve' : 'reject';
+
+        // 构建URL参数（后端使用@RequestParam注解）
+        const params = new URLSearchParams();
+        if (comment) params.append('comment', comment);
+        params.append('approvedBy', approvedBy);
+
+        const url = `/api/equipment-reservations/${reservationId}/${apiEndpoint}?${params.toString()}`;
+        console.log('发送审核请求到:', url);
+
+        axios.post(url)
+            .then(response => {
+                console.log('审核成功响应:', response.data);
+                alert('审核成功');
+                closeReviewModal();
+                loadReservations(currentPage);
+            })
+            .catch(error => {
+                console.error('审核失败:', error);
+                if (error.response) {
+                    console.error('错误响应数据:', error.response.data);
+                    alert('审核失败: ' + (error.response.data.message || error.response.status));
+                } else {
+                    alert('审核失败，请检查网络连接');
+                }
+            });
+    }
+
+    // 打开详情对话框
+    function openDetailModal(reservationId) {
+        console.log('打开详情对话框，预约ID:', reservationId);
+
+        axios.get(`/api/equipment-reservations/${reservationId}`)
+            .then(response => {
+                console.log('获取详情响应:', response.data);
+                const reservation = response.data;
+
+                // 处理不同的响应格式
+                let reservationData = reservation;
+                if (reservation.data) {
+                    reservationData = reservation.data; // 处理包含data字段的响应
+                }
+
+                // 填充详情数据，兼容不同的字段名
+                document.getElementById('detailId').value = reservationData.id || reservationData.reservationId;
+                document.getElementById('detailUserId').value = reservationData.userId;
+                document.getElementById('detailEquipmentName').value = reservationData.equipmentName || '-';
+                document.getElementById('detailDate').value = reservationData.reservationDate || reservationData.date;
+                document.getElementById('detailStartTime').value = reservationData.startTime;
+                document.getElementById('detailEndTime').value = reservationData.endTime;
+
+                // 格式化状态显示
+                let statusText = '';
+                switch (reservationData.status) {
+                    case 'PENDING':
+                        statusText = '待审核';
+                        break;
+                    case 'APPROVED':
+                        statusText = '已批准';
+                        break;
+                    case 'REJECTED':
+                        statusText = '已拒绝';
+                        break;
+                    case 'CANCELLED':
+                        statusText = '已取消';
+                        break;
+                    default:
+                        statusText = reservationData.status;
+                }
+                document.getElementById('detailStatus').value = statusText;
+
+                document.getElementById('detailCreateTime').value = reservationData.createTime || reservationData.createdAt;
+                document.getElementById('detailComment').value = reservationData.comment || reservationData.reviewComment || '';
+
+                // 显示对话框
+                document.getElementById('detailModal').style.display = 'block';
+            })
+            .catch(error => {
+                console.error('获取预约详情失败:', error);
+                if (error.response) {
+                    alert('获取预约详情失败: ' + (error.response.data.message || error.response.status));
+                } else {
+                    alert('获取预约详情失败，请检查网络连接');
+                }
+            });
+    }
+
+    // 关闭详情对话框
+    function closeDetailModal() {
+        document.getElementById('detailModal').style.display = 'none';
+    }
+
+    // 点击模态框外部关闭
+    window.onclick = function(event) {
+        const reviewModal = document.getElementById('reviewModal');
+        const detailModal = document.getElementById('detailModal');
+
+        if (event.target === reviewModal) {
+            closeReviewModal();
+        }
+
+        if (event.target === detailModal) {
+            closeDetailModal();
+        }
+    }
+    loadEquipment();
+    loadEquipmentTypes();
+</script>
+</body>
+</html>

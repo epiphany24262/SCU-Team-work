@@ -1,0 +1,142 @@
+
+<link rel="stylesheet" href="css/home.css">
+
+<div>
+    <h1 class="page-title">管理员主页</h1>
+
+    <!-- 统计卡片 -->
+    <div class="stat-cards">
+        <div class="stat-card">
+            <div class="stat-icon" style="background-color: #409EFF;">
+                <i class="fas fa-users"></i>
+            </div>
+            <div class="stat-info">
+                <div class="stat-number">156人</div>
+                <div class="stat-title">健身房总人数</div>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon" style="background-color: #67C23A;">
+                <i class="fas fa-user-tie"></i>
+            </div>
+            <div class="stat-info">
+                <div class="stat-number">12人</div>
+                <div class="stat-title">员工人数</div>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon" style="background-color: #E6A23C;">
+                <i class="fas fa-user"></i>
+            </div>
+            <div class="stat-info">
+                <div class="stat-number">144人</div>
+                <div class="stat-title">会员人数</div>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon" style="background-color: #F56C6C;">
+                <i class="fas fa-dumbbell"></i>
+            </div>
+            <div class="stat-info">
+                <div class="stat-number">89件</div>
+                <div class="stat-title">器材数量</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 图表区域 -->
+    <div class="chart-area">
+        <div class="chart-card">
+            <div class="chart-title">会员增长趋势</div>
+            <div class="chart-container" id="memberChart"></div>
+        </div>
+        <div class="chart-card">
+            <div class="chart-title">课程报名统计</div>
+            <div class="chart-container" id="classChart"></div>
+        </div>
+    </div>
+
+    <!-- 快速操作 -->
+    <div class="quick-actions">
+        <div class="actions-title">快速操作</div>
+        <div class="actions-grid">
+            <div class="action-item" onclick="app.loadContent('member')">
+                <div class="action-icon"><i class="fas fa-user-plus"></i></div>
+                <div class="action-text">用户管理</div>
+            </div>
+            <div class="action-item" onclick="app.loadContent('coaches')">
+                <div class="action-icon"><i class="fas fa-user-tie"></i></div>
+                <div class="action-text">教练管理</div>
+            </div>
+            <div class="action-item" onclick="app.loadContent('equipment')">
+                <div class="action-icon"><i class="fas fa-dumbbell"></i></div>
+                <div class="action-text">器材管理</div>
+            </div>
+            <div class="action-item" onclick="app.loadContent('course')">
+                <div class="action-icon"><i class="fas fa-calendar-plus"></i></div>
+                <div class="action-text">课程安排</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // home页面的专属JavaScript
+    new Vue({
+        el: '#content-area',
+        mounted() {
+            this.initDashboardCharts();
+        },
+        methods: {
+            initDashboardCharts() {
+                const memberChartEl = document.getElementById('memberChart');
+                const classChartEl = document.getElementById('classChart');
+
+                if (memberChartEl && classChartEl && typeof echarts !== 'undefined') {
+                    // 会员增长趋势图
+                    const memberChart = echarts.init(memberChartEl);
+                    memberChart.setOption({
+                        tooltip: { trigger: 'axis' },
+                        xAxis: {
+                            type: 'category',
+                            data: ['1月', '2月', '3月', '4月', '5月', '6月', '7月']
+                        },
+                        yAxis: { type: 'value' },
+                        series: [{
+                            data: [120, 132, 101, 134, 90, 130, 144],
+                            type: 'line',
+                            smooth: true,
+                            areaStyle: {}
+                        }]
+                    });
+
+                    // 课程报名统计图
+                    const classChart = echarts.init(classChartEl);
+                    classChart.setOption({
+                        tooltip: { trigger: 'axis' },
+                        legend: {
+                            data: ['瑜伽', '有氧操', '力量训练', '游泳']
+                        },
+                        xAxis: {
+                            type: 'category',
+                            data: ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
+                        },
+                        yAxis: { type: 'value' },
+                        series: [
+                            { name: '瑜伽', type: 'bar', data: [20, 32, 18, 34, 30, 40, 35] },
+                            { name: '有氧操', type: 'bar', data: [25, 28, 22, 30, 28, 45, 38] },
+                            { name: '力量训练', type: 'bar', data: [30, 35, 28, 32, 40, 50, 42] },
+                            { name: '游泳', type: 'bar', data: [15, 20, 18, 25, 22, 30, 28] }
+                        ]
+                    });
+
+                    // 响应窗口大小变化
+                    window.addEventListener('resize', function() {
+                        memberChart.resize();
+                        classChart.resize();
+                    });
+                }
+            }
+        }
+    });
+</script>

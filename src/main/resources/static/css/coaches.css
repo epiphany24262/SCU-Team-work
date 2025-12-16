@@ -1,0 +1,378 @@
+
+/* 教练管理主容器 */
+.coach-management {
+    padding: 20px;
+    background: #f5f7fa;
+    min-height: calc(100vh - 60px);
+}
+
+/* 工具栏样式 */
+.coach-management .toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding: 20px;
+    background: #ffffff;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.coach-management .search-box {
+    display: flex;
+    align-items: center;
+}
+
+/* 表格容器样式 */
+.coach-management .table-container {
+    background: #ffffff;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+}
+
+/* 表格样式 */
+.coach-management .el-table {
+    border-radius: 8px;
+}
+
+.coach-management .el-table th {
+    background: #f8f9fa;
+    color: #333;
+    font-weight: 600;
+    border-bottom: 1px solid #eaeaea;
+}
+
+.coach-management .el-table td {
+    border-bottom: 1px solid #f0f0f0;
+    padding: 12px 0;
+}
+
+.coach-management .el-table .cell {
+    padding: 0 16px;
+    line-height: 1.5;
+}
+
+/* 操作按钮样式 */
+.coach-management .action-buttons {
+    display: flex;
+    gap: 8px;
+}
+
+.coach-management .action-buttons .el-button {
+    padding: 6px 12px;
+    border-radius: 4px;
+    font-size: 12px;
+}
+
+/* 分页样式 */
+.coach-management .pagination {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 20px;
+    padding: 16px 20px;
+    background: #ffffff;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* 对话框样式 */
+.coach-management .el-dialog {
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.coach-management .el-dialog__header {
+    padding: 20px 20px 10px;
+    border-bottom: 1px solid #eaeaea;
+    background: #fafbfc;
+    border-radius: 8px 8px 0 0;
+}
+
+.coach-management .el-dialog__title {
+    font-size: 16px;
+    font-weight: 600;
+    color: #333;
+}
+
+.coach-management .el-dialog__body {
+    padding: 20px;
+}
+
+.coach-management .el-dialog__footer {
+    padding: 10px 20px 20px;
+    border-top: 1px solid #eaeaea;
+    background: #fafbfc;
+    border-radius: 0 0 8px 8px;
+}
+
+/* 表单样式 */
+.coach-management .el-form-item {
+    margin-bottom: 20px;
+}
+
+.coach-management .el-form-item__label {
+    font-weight: 500;
+    color: #333;
+    padding-right: 15px;
+}
+
+.coach-management .el-input__inner,
+.coach-management .el-textarea__inner,
+.coach-management .el-select .el-input__inner {
+    border-radius: 4px;
+    border: 1px solid #dcdfe6;
+    transition: all 0.3s;
+}
+
+.coach-management .el-input__inner:focus,
+.coach-management .el-textarea__inner:focus,
+.coach-management .el-select .el-input__inner:focus {
+    border-color: #409eff;
+    box-shadow: 0 0 0 2px rgba(64, 158, 255, 0.2);
+}
+
+/* 单选按钮组样式 */
+.coach-management .el-radio-group {
+    display: flex;
+    gap: 20px;
+}
+
+.coach-management .el-radio {
+    margin-right: 0;
+}
+
+/* 数字输入框样式 */
+.coach-management .el-input-number {
+    width: 100%;
+}
+
+.coach-management .el-input-number .el-input__inner {
+    text-align: left;
+}
+
+/* 描述列表样式 */
+.coach-management .el-descriptions {
+    margin: 10px 0;
+}
+
+.coach-management .el-descriptions__title {
+    font-size: 14px;
+    color: #333;
+    margin-bottom: 16px;
+}
+
+.coach-management .el-descriptions__label {
+    background: #f8f9fa;
+    font-weight: 500;
+    color: #333;
+    width: 120px;
+}
+
+.coach-management .el-descriptions__content {
+    color: #666;
+}
+
+/* 标签样式 */
+.coach-management .el-tag {
+    border: none;
+    border-radius: 12px;
+    padding: 4px 10px;
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.coach-management .el-tag--primary {
+    background: #ecf5ff;
+    color: #409eff;
+}
+
+.coach-management .el-tag--danger {
+    background: #fef0f0;
+    color: #f56c6c;
+}
+
+.coach-management .el-tag--success {
+    background: #f0f9eb;
+    color: #67c23a;
+}
+
+.coach-management .el-tag--warning {
+    background: #fdf6ec;
+    color: #e6a23c;
+}
+
+/* 加载状态样式 */
+.coach-management .el-loading-mask {
+    border-radius: 8px;
+}
+
+/* 空状态样式 */
+.coach-management .el-table__empty-block {
+    padding: 40px 0;
+}
+
+.coach-management .el-table__empty-text {
+    color: #999;
+    font-size: 14px;
+}
+
+/* 按钮样式优化 */
+.coach-management .el-button {
+    border-radius: 4px;
+    font-weight: 500;
+    transition: all 0.3s;
+}
+
+.coach-management .el-button--primary {
+    background: #409eff;
+    border-color: #409eff;
+}
+
+.coach-management .el-button--primary:hover {
+    background: #66b1ff;
+    border-color: #66b1ff;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(64, 158, 255, 0.3);
+}
+
+.coach-management .el-button--danger {
+    background: #f56c6c;
+    border-color: #f56c6c;
+}
+
+.coach-management .el-button--danger:hover {
+    background: #f78989;
+    border-color: #f78989;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(245, 108, 108, 0.3);
+}
+
+.coach-management .el-button--info {
+    background: #909399;
+    border-color: #909399;
+}
+
+.coach-management .el-button--info:hover {
+    background: #a6a9ad;
+    border-color: #a6a9ad;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(144, 147, 153, 0.3);
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+    .coach-management {
+        padding: 10px;
+    }
+
+    .coach-management .toolbar {
+        flex-direction: column;
+        gap: 15px;
+        align-items: stretch;
+    }
+
+    .coach-management .search-box {
+        width: 100%;
+    }
+
+    .coach-management .search-box .el-input {
+        width: 100%;
+    }
+
+    .coach-management .action-buttons {
+        flex-direction: column;
+    }
+
+    .coach-management .pagination {
+        justify-content: center;
+    }
+
+    .coach-management .el-dialog {
+        width: 95% !important;
+        margin: 5% auto !important;
+    }
+}
+
+/* 滚动条样式 */
+.coach-management ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+.coach-management ::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 3px;
+}
+
+.coach-management ::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 3px;
+}
+
+.coach-management ::-webkit-scrollbar-thumb:hover {
+    background: #a8a8a8;
+}
+
+/* 动画效果 */
+.coach-management .el-table__row {
+    transition: background-color 0.3s;
+}
+
+.coach-management .el-table__row:hover {
+    background-color: #f5f7fa;
+}
+
+.coach-management .el-button {
+    transition: all 0.3s ease;
+}
+
+/* 输入框聚焦效果 */
+.coach-management .el-input.is-active .el-input__inner,
+.coach-management .el-input__inner:focus {
+    border-color: #409eff;
+    outline: 0;
+    box-shadow: 0 0 0 2px rgba(64, 158, 255, 0.2);
+}
+
+/* 选择器样式 */
+.coach-management .el-select .el-input.is-focus .el-input__inner {
+    border-color: #409eff;
+}
+
+/* 数字输入框按钮样式 */
+.coach-management .el-input-number__increase,
+.coach-management .el-input-number__decrease {
+    background: #f5f7fa;
+    border-left: 1px solid #dcdfe6;
+}
+
+.coach-management .el-input-number__increase:hover,
+.coach-management .el-input-number__decrease:hover {
+    color: #409eff;
+}
+
+/* 消息提示样式 */
+.coach-management .el-message {
+    z-index: 9999 !important;
+}
+
+/* 确认对话框样式 */
+.coach-management .el-message-box {
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.coach-management .el-message-box__title {
+    font-size: 16px;
+    font-weight: 600;
+    color: #333;
+}
+
+.coach-management .el-message-box__content {
+    padding: 20px;
+}
+
+.coach-management .el-message-box__btns {
+    padding: 10px 20px 20px;
+}

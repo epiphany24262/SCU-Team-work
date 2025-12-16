@@ -1,0 +1,338 @@
+<link rel="stylesheet" href="css/mycard.css">
+
+<div class="mycard-container">
+    <el-card class="main-card" shadow="never">
+        <div slot="header" class="card-header">
+            <span class="title">
+                <i class="el-icon-s-custom"></i>
+                我的健身卡
+            </span>
+        </div>
+
+        <!-- 健身卡信息 -->
+        <el-row :gutter="20">
+            <el-col :span="12">
+                <div class="info-section">
+                    <h3 class="section-title">健身卡信息</h3>
+                    <el-descriptions :column="1" border>
+                        <el-descriptions-item label="卡号">
+                            <el-tag type="primary">GYM-{{formatCardId(currentUser.id)}}</el-tag>
+                        </el-descriptions-item>
+                        <el-descriptions-item label="持卡人">{{currentUser.realName || '会员'}}</el-descriptions-item>
+                        <el-descriptions-item label="手机号码">{{currentUser.phone || '未设置'}}</el-descriptions-item>
+                        <el-descriptions-item label="健身卡状态">
+                            <el-tag :type="getCardStatusType()">{{getCardStatus()}}</el-tag>
+                        </el-descriptions-item>
+                        <el-descriptions-item label="有效期">
+                            {{formatDate(currentUser.cardTime) || '未激活'}} 至 {{formatDate(currentUser.expireTime) || '未设置'}}
+                        </el-descriptions-item>
+                        <el-descriptions-item label="剩余天数">
+                            <span class="remain-days">{{calculateRemainDays()}} 天</span>
+                        </el-descriptions-item>
+                    </el-descriptions>
+                </div>
+            </el-col>
+
+            <el-col :span="12">
+                <div class="action-section">
+                    <h3 class="section-title">续费延长</h3>
+                    <div class="renew-card">
+                        <div class="card-illustration">
+                            <div class="card-visual">
+                                <i class="el-icon-s-opportunity"></i>
+                                <div class="card-title">健身卡</div>
+                                <div class="card-validity">
+                                    {{getCardValidity()}}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="renew-options">
+                            <h4>选择续费时长</h4>
+                            <el-radio-group v-model="selectedDuration" @change="calculatePrice">
+                                <el-radio :label="1">1个月（¥100）</el-radio>
+                                <el-radio :label="3">3个月（¥280）</el-radio>
+                                <el-radio :label="6">6个月（¥520）</el-radio>
+                                <el-radio :label="12">1年（¥980）</el-radio>
+                            </el-radio-group>
+
+                            <div class="price-info">
+                                <div class="price-item">
+                                    <span>续费时长：</span>
+                                    <span>{{selectedDuration}} 个月</span>
+                                </div>
+                                <div class="price-item">
+                                    <span>续费金额：</span>
+                                    <span class="total-price">¥ {{totalPrice}}</span>
+                                </div>
+                                <div class="price-item">
+                                    <span>到期时间：</span>
+                                    <span class="new-expire">{{calculateNewExpire()}}</span>
+                                </div>
+                            </div>
+
+                            <el-button type="primary" size="large" style="width: 100%; margin-top: 20px;"
+                                       @click="handleRenew">
+                                <i class="el-icon-wallet"></i>
+                                立即续费
+                            </el-button>
+                        </div>
+                    </div>
+                </div>
+            </el-col>
+        </el-row>
+
+        <!-- 消费记录 -->
+        <div class="record-section">
+            <h3 class="section-title">消费记录</h3>
+            <el-table :data="consumptionRecords" style="width: 100%">
+                <el-table-column prop="date" label="消费时间" width="180"></el-table-column>
+                <el-table-column prop="type" label="消费类型">
+                    <template slot-scope="scope">
+                        <el-tag :type="scope.row.type === '续费' ? 'success' : 'info'">
+                            {{scope.row.type}}
+                        </el-tag>
+                    </template>
+                </el-table-column>
+                <el-table-column prop="amount" label="金额（元）"></el-table-column>
+                <el-table-column prop="duration" label="时长" width="100"></el-table-column>
+                <el-table-column prop="expireDate" label="到期时间" width="180"></el-table-column>
+                <el-table-column label="支付状态" width="100">
+                    <template slot-scope="scope">
+                        <el-tag type="success" size="small">已支付</el-tag>
+                    </template>
+                </el-table-column>
+            </el-table>
+        </div>
+    </el-card>
+
+    <!-- 支付弹窗 -->
+    <el-dialog title="支付续费" :visible.sync="paymentDialogVisible" width="500px" @close="resetPaymentDialog">
+        <div class="payment-dialog">
+            <!-- 支付信息 -->
+            <div class="payment-info-section">
+                <h3>支付信息</h3>
+                <el-descriptions :column="1" size="medium">
+                    <el-descriptions-item label="续费时长">{{selectedDuration}}个月</el-descriptions-item>
+                    <el-descriptions-item label="支付金额">¥{{totalPrice}}</el-descriptions-item>
+                    <el-descriptions-item label="到期时间">{{calculateNewExpire()}}</el-descriptions-item>
+                </el-descriptions>
+            </div>
+
+            <!-- 支付方式选择 -->
+            <div class="payment-method-section">
+                <h3>选择支付方式</h3>
+                <el-radio-group v-model="paymentMethod" @change="updateQRCode">
+                    <div class="payment-method-option">
+                        <el-radio label="alipay">
+                            <div class="payment-method-content">
+                                <i class="el-icon-s-finance"></i>
+                                <span>支付宝支付</span>
+                            </div>
+                        </el-radio>
+                    </div>
+                    <div class="payment-method-option">
+                        <el-radio label="wechat">
+                            <div class="payment-method-content">
+                                <i class="el-icon-s-promotion"></i>
+                                <span>微信支付</span>
+                            </div>
+                        </el-radio>
+                    </div>
+                </el-radio-group>
+            </div>
+
+            <!-- 二维码展示 -->
+            <div class="qrcode-section" v-show="paymentMethod">
+                <h3>请扫描二维码支付</h3>
+                <div class="qrcode-container">
+                    <img :src="currentQRCode" alt="支付二维码" class="qrcode-image">
+                </div>
+                <p class="qrcode-hint">请使用{{paymentMethod === 'alipay' ? '支付宝' : '微信'}}扫码支付</p>
+            </div>
+
+            <!-- 操作按钮 -->
+            <div class="payment-actions">
+                <el-button @click="cancelPayment" size="medium">取消</el-button>
+                <el-button type="primary" @click="confirmPayment" size="medium" :loading="paymentLoading">
+                    我已付款
+                </el-button>
+            </div>
+        </div>
+    </el-dialog>
+</div>
+
+<script>
+    new Vue({
+        el: '#content-area',
+        data() {
+            return {
+                selectedDuration: 1,
+                totalPrice: 100,
+                consumptionRecords: [
+                    { date: '2025-11-01 10:30', type: '开卡', amount: '100', duration: '1个月', expireDate: '2025-12-01' },
+                    { date: '2025-12-01 14:20', type: '续费', amount: '280', duration: '3个月', expireDate: '2025-03-01' }
+                ],
+                priceTable: {
+                    1: 100,
+                    3: 280,
+                    6: 520,
+                    12: 980
+                },
+                paymentDialogVisible: false,
+                paymentMethod: 'alipay',
+                currentQRCode: 'images/alipay.jpg',
+                paymentLoading: false,
+                qrCodes: {
+                    alipay: 'images/alipay.jpg',
+                    wechat: 'images/wechat.jpg'
+                }
+            };
+        },
+        computed: {
+            currentUser() {
+                return app ? app.currentUser : {};
+            }
+        },
+        mounted() {
+            this.calculatePrice();
+        },
+        methods: {
+            formatCardId(userId) {
+                if (userId) {
+                    return userId.toString().padStart(6, '0');
+                }
+                return '000000';
+            },
+
+            formatDate(dateStr) {
+                if (!dateStr) return '';
+                const date = new Date(dateStr);
+                return date.toLocaleDateString();
+            },
+
+            getCardStatus() {
+                if (!this.currentUser.expireTime) return '未激活';
+                const expireDate = new Date(this.currentUser.expireTime);
+                const now = new Date();
+                if (expireDate < now) return '已过期';
+                return '有效';
+            },
+
+            getCardStatusType() {
+                const status = this.getCardStatus();
+                if (status === '有效') return 'success';
+                if (status === '已过期') return 'danger';
+                return 'info';
+            },
+
+            calculateRemainDays() {
+                if (!this.currentUser.expireTime) return 0;
+                const expireDate = new Date(this.currentUser.expireTime);
+                const now = new Date();
+                const diffTime = expireDate - now;
+                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                return diffDays > 0 ? diffDays : 0;
+            },
+
+            getCardValidity() {
+                const remainDays = this.calculateRemainDays();
+                if (remainDays <= 0) return '已过期';
+                return `剩余 ${remainDays} 天`;
+            },
+
+            calculatePrice() {
+                this.totalPrice = this.priceTable[this.selectedDuration] || 100;
+            },
+
+            calculateNewExpire() {
+                let newExpireDate = new Date();
+                if (this.currentUser.expireTime) {
+                    const currentExpire = new Date(this.currentUser.expireTime);
+                    if (currentExpire > newExpireDate) {
+                        newExpireDate = currentExpire;
+                    }
+                }
+                newExpireDate.setMonth(newExpireDate.getMonth() + this.selectedDuration);
+                return newExpireDate.toLocaleDateString();
+            },
+
+            handleRenew() {
+                this.paymentDialogVisible = true;
+                this.paymentMethod = 'alipay';
+                this.currentQRCode = this.qrCodes.alipay;
+            },
+
+            updateQRCode() {
+                this.currentQRCode = this.qrCodes[this.paymentMethod];
+            },
+
+            cancelPayment() {
+                this.paymentDialogVisible = false;
+                this.$message.info('已取消支付');
+            },
+
+            async confirmPayment() {
+                this.paymentLoading = true;
+
+                try {
+                    const response = await axios.post('/api/cardAndVip/renewGymCard', {
+                        userId: this.currentUser.id,
+                        months: this.selectedDuration
+                    });
+
+                    if (response.data && response.data.success) {
+                        // 简单直接的方法：合并所有字段
+                        const fullUpdatedUser = {
+                            ...this.currentUser,  // 保留所有原有字段
+                            ...(response.data.data.user || {}),  // 覆盖后端返回的更新字段
+                            updateTime: new Date().toISOString()  // 确保更新时间
+                        };
+
+                        // 如果后端没有返回expireTime，使用前端计算的
+                        if (!fullUpdatedUser.expireTime) {
+                            fullUpdatedUser.expireTime = this.calculateExpireTimeFromResponse();
+                        }
+
+                        // 更新主应用
+                        if (window.app && window.app.updateUserInfo) {
+                            window.app.updateUserInfo(fullUpdatedUser);
+                        }
+
+                        // 更新localStorage
+                        localStorage.setItem('userInfo', JSON.stringify(fullUpdatedUser));
+
+                        this.$message.success('续费成功！');
+                        this.paymentDialogVisible = false;
+                        this.addConsumptionRecord();
+
+                    } else {
+                        this.$message.error(response.data.message || '续费失败');
+                    }
+                } catch (error) {
+                    console.error('续费失败:', error);
+                    this.$message.error('续费失败，请稍后重试');
+                } finally {
+                    this.paymentLoading = false;
+                }
+            },
+
+            addConsumptionRecord() {
+                const newRecord = {
+                    date: new Date().toLocaleString(),
+                    type: '续费',
+                    amount: this.totalPrice,
+                    duration: this.selectedDuration + '个月',
+                    expireDate: this.calculateNewExpire()
+                };
+                this.consumptionRecords.unshift(newRecord);
+            },
+
+            resetPaymentDialog() {
+                this.paymentLoading = false;
+                this.paymentMethod = 'alipay';
+                this.currentQRCode = this.qrCodes.alipay;
+            }
+        }
+    });
+</script>

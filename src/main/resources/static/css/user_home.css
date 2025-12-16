@@ -1,0 +1,264 @@
+/* Element UI 风格的用户首页样式 */
+
+.user-home-container {
+    padding: 20px;
+}
+
+/* 欢迎区域 */
+.welcome-card {
+    height: 100%;
+    min-height: 220px;
+}
+
+.welcome-header {
+    margin-bottom: 20px;
+}
+
+.welcome-title {
+    font-size: 24px;
+    font-weight: 600;
+    color: #303133;
+    margin-bottom: 10px;
+}
+
+.welcome-title .username {
+    color: #409EFF;
+}
+
+.welcome-subtitle {
+    color: #909399;
+    font-size: 14px;
+}
+
+.user-info-cards {
+    margin-top: 20px;
+}
+
+.info-card {
+    display: flex;
+    align-items: center;
+    padding: 15px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    transition: all 0.3s;
+}
+
+.info-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.info-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 15px;
+    color: white;
+    font-size: 20px;
+}
+
+.info-content .info-label {
+    color: #909399;
+    font-size: 12px;
+    margin-bottom: 5px;
+}
+
+.info-content .info-value {
+    color: #303133;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+/* 头像卡片 */
+.avatar-card {
+    height: 100%;
+    min-height: 220px;
+}
+
+.avatar-content {
+    text-align: center;
+    padding: 20px 0;
+}
+
+.avatar-circle {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #409EFF 0%, #67C23A 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 20px;
+    color: white;
+    font-size: 40px;
+}
+
+.avatar-quote p {
+    color: #606266;
+    font-style: italic;
+    margin-bottom: 5px;
+}
+
+.quote-author {
+    color: #909399;
+    font-size: 12px;
+}
+
+/* 区域卡片 */
+.section-card {
+    margin-bottom: 20px;
+    border: 1px solid #ebeef5 !important;
+}
+
+.section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.section-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: #303133;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.section-subtitle {
+    color: #909399;
+    font-size: 14px;
+}
+
+/* 推荐卡片 */
+.recommendation-card {
+    height: 100%;
+    transition: all 0.3s;
+}
+
+.recommendation-card:hover {
+    transform: translateY(-5px);
+}
+
+.rec-header {
+    color: white;
+    padding: 20px;
+    text-align: center;
+    border-radius: 4px 4px 0 0;
+    margin: -20px -20px 20px -20px;
+}
+
+.rec-header i {
+    font-size: 32px;
+    margin-bottom: 10px;
+    display: block;
+}
+
+.rec-header h3 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.rec-content {
+    padding: 10px 0;
+}
+
+/* 统计卡片 */
+.stat-card {
+    display: flex;
+    align-items: center;
+    padding: 20px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    transition: all 0.3s;
+}
+
+.stat-card:hover {
+    background: #e9ecef;
+}
+
+.stat-icon {
+    font-size: 36px;
+    margin-right: 20px;
+}
+
+.stat-content {
+    flex: 1;
+}
+
+.stat-number {
+    font-size: 24px;
+    font-weight: 600;
+    color: #303133;
+    margin-bottom: 5px;
+}
+
+.stat-label {
+    color: #909399;
+    font-size: 14px;
+    margin-bottom: 8px;
+}
+
+.stat-trend {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 12px;
+}
+
+/* 器材卡片 */
+.equipment-card {
+    text-align: center;
+    transition: all 0.3s;
+}
+
+.equipment-card:hover {
+    transform: translateY(-5px);
+}
+
+.eq-icon {
+    font-size: 40px;
+    margin-bottom: 15px;
+}
+
+.eq-name {
+    font-size: 16px;
+    font-weight: 600;
+    color: #303133;
+    margin-bottom: 15px;
+}
+
+.eq-status {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    margin-bottom: 15px;
+}
+
+/* 小贴士 */
+.tips-content .el-alert {
+    margin-bottom: 8px !important;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+    .user-welcome-section .el-col {
+        margin-bottom: 20px;
+    }
+
+    .section-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+    }
+
+    .recommendation-cards .el-col,
+    .stat-cards .el-col,
+    .equipment-grid .el-col {
+        margin-bottom: 20px;
+    }
+}
