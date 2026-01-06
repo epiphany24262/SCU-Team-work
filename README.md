@@ -2,10 +2,15 @@
 
 这是一个基于 Spring Boot 的健身房管理系统，用于管理健身房的日常运营。
 
-## 项目文档 (Project Documentation)
+## 📚 项目文档 (Project Documentation)
 
+> **文档导航中心:** [DOCUMENTATION_HUB.md](DOCUMENTATION_HUB.md) - 查看所有文档的完整索引
+
+### 核心文档 (Core Documents)
 - **中文索引:** [PROJECT_INDEX.md](PROJECT_INDEX.md) - 完整的项目结构、API接口和模块说明
 - **English Index:** [PROJECT_INDEX_EN.md](PROJECT_INDEX_EN.md) - Complete project structure, API endpoints, and module descriptions
+- **代码导航:** [CODE_NAVIGATION.md](CODE_NAVIGATION.md) - 快速定位代码文件
+- **API文档:** [API_REFERENCE.md](API_REFERENCE.md) - 所有API接口详细说明
 
 ## 快速开始 (Quick Start)
 
