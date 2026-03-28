@@ -1,0 +1,817 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>车牌识别系统</title>
+    <link rel="stylesheet" href="css/plate_recognize.css">
+    <link rel="stylesheet" href="css/lib/index.min.css">
+</head>
+<body>
+<div id="app">
+    <div class="container">
+        <!-- 头部 -->
+        <div class="header">
+            <div class="header-title">
+                <i class="el-icon-camera-solid"></i>
+                车牌识别系统
+            </div>
+            <div class="header-subtitle">
+                支持多图片上传、批量识别车牌、结果保存
+            </div>
+        </div>
+
+        <!-- 操作区域 -->
+        <div class="actions-section">
+            <div class="actions-row">
+                <div class="left-actions">
+                    <!-- 文件上传 -->
+                    <el-upload
+                            class="upload-demo"
+                            ref="upload"
+                            action="#"
+                            :multiple="true"
+                            :show-file-list="false"
+                            :before-upload="beforeUpload"
+                            :http-request="handleUpload"
+                            accept=".jpg,.jpeg,.png,.gif,.bmp"
+                            style="display: inline-block;">
+                        <el-button type="primary" icon="el-icon-upload">
+                            上传图片
+                        </el-button>
+                    </el-upload>
+
+                    <el-button
+                            @click="recognizeAllPlates"
+                            type="warning"
+                            :loading="recognizeLoading"
+                            :disabled="imageList.length === 0">
+                        <i class="el-icon-search"></i> 车牌识别
+                    </el-button>
+
+                    <el-button
+                            @click="deleteSelectedImages"
+                            type="danger"
+                            :disabled="selectedImages.length === 0">
+                        <i class="el-icon-delete"></i> 删除选中
+                    </el-button>
+                </div>
+
+                <div class="right-actions">
+                    <el-button
+                            @click="saveData"
+                            type="success"
+                            :loading="saveLoading"
+                            :disabled="recognizedCount === 0">
+                        <i class="el-icon-document-checked"></i> 保存结果
+                    </el-button>
+
+                    <el-button @click="clearAll" type="info">
+                        <i class="el-icon-delete-solid"></i> 清空所有
+                    </el-button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 统计信息 -->
+        <div class="stats-section">
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <div class="stat-label">图片总数</div>
+                    <div class="stat-value">{{ imageList.length }}</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">已选中</div>
+                    <div class="stat-value">{{ selectedImages.length }}</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">已识别车牌</div>
+                    <div class="stat-value success">{{ recognizedCount }}</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">识别成功率</div>
+                    <div class="stat-value warning" v-if="imageList.length > 0">
+                        {{ recognitionRate }}%
+                    </div>
+                    <div class="stat-value warning" v-else>0%</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 图片区域 -->
+        <div class="images-section">
+            <div class="section-title">
+                <h3>图片列表</h3>
+                <div class="section-controls">
+                    <el-button
+                            @click="toggleSelectAll"
+                            size="mini"
+                            :type="allSelected ? 'primary' : 'default'">
+                        {{ allSelected ? '取消全选' : '全选' }}
+                    </el-button>
+                    <span class="el-dropdown-link" style="color: #606266; font-size: 14px;">
+                            {{ selectedImages.length }}/{{ imageList.length }} 已选择
+                        </span>
+                </div>
+            </div>
+
+            <div class="images-container">
+                <!-- 上传区域 -->
+                <div class="upload-area"
+                     @click="$refs.upload.$children[0].$el.click()"
+                     @dragover.prevent="onDragOver"
+                     @dragleave.prevent="onDragLeave"
+                     @drop.prevent="onDrop">
+                    <i class="el-icon-upload"></i>
+                    <p>点击或拖拽图片到此区域上传</p>
+                    <div class="upload-hint">支持 JPG, PNG, GIF, BMP 格式</div>
+                </div>
+
+                <!-- 空状态 -->
+                <div v-if="imageList.length === 0" class="empty-state">
+                    <i class="el-icon-picture-outline"></i>
+                    <p>暂无图片</p>
+                    <div class="hint">请上传图片开始车牌识别</div>
+                </div>
+
+                <!-- 图片卡片 -->
+                <div
+                        v-for="(image, index) in imageList"
+                        :key="image.id"
+                        class="image-card"
+                        :class="{ 'selected': image.selected }"
+                        @click="toggleImageSelect(image)">
+                    <!-- 选择框 -->
+                    <el-checkbox
+                            v-model="image.selected"
+                            class="image-checkbox"
+                            @change="handleCheckboxChange(image)">
+                    </el-checkbox>
+
+                    <!-- 图片预览 -->
+                    <div class="image-preview" @click.stop="viewOriginalImage(image)">
+                        <img
+                                :src="image.url"
+                                :alt="image.name"
+                                @error="onImageError"
+                                style="cursor: pointer;"
+                                :title="'点击查看原图: ' + image.name">
+                    </div>
+
+                    <!-- 图片信息 -->
+                    <div class="image-info">
+                        <div class="image-name">{{ image.name }}</div>
+                        <div class="image-size">{{ formatFileSize(image.size) }}</div>
+
+                        <!-- 车牌识别结果 -->
+                        <div v-if="image.plateNumber" class="plate-info">
+                            <div class="plate-number">{{ image.plateNumber }}</div>
+                            <div class="plate-details">
+                                <span>颜色: {{ image.plateColor || '未知' }}</span>
+                                <span>类型: {{ image.vehicleType || '未知' }}</span>
+                                <span class="confidence" :class="getConfidenceClass(image.confidence)">
+                                        置信度: {{ image.confidence ? image.confidence.toFixed(1) + '%' : '未知' }}
+                                    </span>
+                            </div>
+                        </div>
+
+                        <div v-else-if="image.recognizing" class="plate-info" style="text-align: center; color: #909399;">
+                            <i class="el-icon-loading"></i> 识别中...
+                        </div>
+
+                        <div v-else class="plate-info" style="text-align: center; color: #909399;">
+                            未识别
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 图片预览弹窗 -->
+    <el-dialog
+            :visible.sync="previewVisible"
+            :title="previewTitle"
+            width="80%"
+            top="5vh"
+            @close="previewVisible = false">
+        <div class="image-preview-dialog">
+            <img
+                    :src="previewImageUrl"
+                    :alt="previewTitle"
+                    style="max-width: 100%; max-height: 70vh; display: block; margin: 0 auto;">
+        </div>
+        <span slot="footer" class="dialog-footer">
+                <el-button @click="previewVisible = false">关闭</el-button>
+                <el-button
+                        type="primary"
+                        @click="downloadImage"
+                        :disabled="!previewImageUrl">
+                    <i class="el-icon-download"></i> 下载图片
+                </el-button>
+            </span>
+    </el-dialog>
+
+    <!-- 加载遮罩 -->
+    <div v-if="loading" class="loading-overlay">
+        <div class="loading-spinner">
+            <i class="el-icon-loading"></i>
+            <p>{{ loadingText }}</p>
+        </div>
+    </div>
+</div>
+<script src="js/lib/vue.min.js"></script>
+<script src="js/lib/index.min.js"></script>
+<script src="js/lib/axios.min.js"></script>
+<script>
+    new Vue({
+        el: '#app',
+        data() {
+            return {
+                // 图片列表
+                imageList: [],
+                selectedImages: [],
+
+                // 加载状态
+                loading: false,
+                loadingText: '',
+                recognizeLoading: false,
+                saveLoading: false,
+
+                // 任务ID
+                jobId: `plate_job_${Date.now()}`,
+
+                // 统计
+                nextImageId: 1,
+
+                // 图片预览
+                previewVisible: false,
+                previewImageUrl: '',
+                previewTitle: '',
+
+                // 拖拽状态
+                isDragOver: false
+            }
+        },
+        computed: {
+            // 全选状态
+            allSelected() {
+                return this.imageList.length > 0 &&
+                    this.imageList.every(img => img.selected);
+            },
+
+            // 已识别数量
+            recognizedCount() {
+                return this.imageList.filter(img => img.plateNumber).length;
+            },
+
+            // 识别成功率
+            recognitionRate() {
+                const recognized = this.recognizedCount;
+                const total = this.imageList.length;
+                return total > 0 ? Math.round((recognized / total) * 100) : 0;
+            }
+        },
+        mounted() {
+            // 初始化时可以加载之前的数据（如果需要）
+            this.loadFromLocalStorage();
+
+            // 监听页面关闭，保存数据到本地存储
+            window.addEventListener('beforeunload', this.saveToLocalStorage);
+        },
+        beforeDestroy() {
+            window.removeEventListener('beforeunload', this.saveToLocalStorage);
+        },
+        methods: {
+            // 从本地存储加载数据
+            loadFromLocalStorage() {
+                try {
+                    const savedData = localStorage.getItem('plateRecognitionData');
+                    if (savedData) {
+                        const data = JSON.parse(savedData);
+                        this.imageList = data.imageList || [];
+                        this.nextImageId = data.nextImageId || 1;
+                        this.updateSelectedImages();
+                    }
+                } catch (error) {
+                    console.error('加载本地存储失败:', error);
+                }
+            },
+
+            // 保存数据到本地存储
+            saveToLocalStorage() {
+                try {
+                    const data = {
+                        imageList: this.imageList,
+                        nextImageId: this.nextImageId
+                    };
+                    localStorage.setItem('plateRecognitionData', JSON.stringify(data));
+                } catch (error) {
+                    console.error('保存到本地存储失败:', error);
+                }
+            },
+
+            // 上传前验证
+            beforeUpload(file) {
+                const isImage = /\.(jpg|jpeg|png|gif|bmp)$/i.test(file.name);
+                const isLt10M = file.size / 1024 / 1024 < 10;
+
+                if (!isImage) {
+                    this.$message.error('只能上传图片文件!');
+                    return false;
+                }
+                if (!isLt10M) {
+                    this.$message.error('图片大小不能超过10MB!');
+                    return false;
+                }
+
+                return true;
+            },
+
+            // 处理上传
+            handleUpload(file) {
+                return new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        const imageData = {
+                            id: this.nextImageId++,
+                            name: file.file.name,  // 注意：这里用 file.file
+                            size: file.file.size,
+                            url: e.target.result,
+                            file: file.file,       // 注意：这里用 file.file
+                            selected: false,
+                            plateNumber: null,
+                            plateColor: null,
+                            vehicleType: null,
+                            confidence: null,
+                            recognizing: false
+                        };
+
+                        this.imageList.push(imageData);
+                        this.saveToLocalStorage();
+                        this.$message.success(`已添加图片: ${file.file.name}`);
+                        resolve();
+                    };
+                    reader.onerror = () => {
+                        reject(new Error('文件读取失败'));
+                    };
+                    reader.readAsDataURL(file.file);  // 注意：这里用 file.file
+                });
+            },
+
+            // 批量上传
+            async batchUpload(files) {
+                this.loading = true;
+                this.loadingText = '正在上传图片...';
+
+                for (const file of files) {
+                    if (this.beforeUpload(file)) {
+                        await this.handleUpload(file);
+                    }
+                }
+
+                this.loading = false;
+                this.$message.success(`成功上传 ${files.length} 张图片`);
+            },
+
+            // 图片转Base64（与您提供的代码一致）
+            imageToBase64(url) {
+                return new Promise((resolve) => {
+                    const img = new Image();
+                    img.crossOrigin = 'anonymous';
+                    img.onload = function() {
+                        const canvas = document.createElement('canvas');
+                        canvas.width = img.width;
+                        canvas.height = img.height;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0);
+                        const base64 = canvas.toDataURL('image/jpeg', 0.8);
+                        resolve(base64.split(',')[1]); // 纯Base64数据
+                    };
+                    img.onerror = () => resolve(null);
+                    img.src = url;
+                });
+            },
+
+            // 选择/取消选择图片
+            toggleImageSelect(image) {
+                // 阻止点击复选框时的重复触发
+                if (!event.target.classList.contains('el-checkbox__inner')) {
+                    image.selected = !image.selected;
+                    this.updateSelectedImages();
+                }
+            },
+
+            // 处理复选框变化
+            handleCheckboxChange() {
+                this.updateSelectedImages();
+            },
+
+            // 更新选中图片列表
+            updateSelectedImages() {
+                this.selectedImages = this.imageList.filter(img => img.selected);
+            },
+
+            // 全选/取消全选
+            toggleSelectAll() {
+                const selectAll = !this.allSelected;
+                this.imageList.forEach(img => {
+                    img.selected = selectAll;
+                });
+                this.updateSelectedImages();
+            },
+
+            // 删除选中的图片
+            async deleteSelectedImages() {
+                if (this.selectedImages.length === 0) {
+                    this.$message.warning('请先选择要删除的图片');
+                    return;
+                }
+
+                try {
+                    await this.$confirm(`确定删除选中的 ${this.selectedImages.length} 张图片吗？`, '提示', {
+                        confirmButtonText: '确定',
+                        cancelButtonText: '取消',
+                        type: 'warning'
+                    });
+
+                    // 收集要删除的图片ID
+                    const selectedIds = this.selectedImages.map(img => img.id);
+
+                    // 从列表中移除
+                    this.imageList = this.imageList.filter(img => !selectedIds.includes(img.id));
+
+                    // 清空选中列表
+                    this.selectedImages = [];
+
+                    // 保存到本地存储
+                    this.saveToLocalStorage();
+
+                    this.$message.success('删除成功');
+                } catch (error) {
+                    if (error !== 'cancel') {
+                        this.$message.error('删除失败: ' + error.message);
+                    }
+                }
+            },
+
+            // 清空所有图片
+            async clearAll() {
+                if (this.imageList.length === 0) {
+                    this.$message.warning('当前没有图片可清空');
+                    return;
+                }
+
+                try {
+                    await this.$confirm('确定清空所有图片吗？此操作不可恢复。', '警告', {
+                        confirmButtonText: '确定',
+                        cancelButtonText: '取消',
+                        type: 'warning'
+                    });
+
+                    this.imageList = [];
+                    this.selectedImages = [];
+                    this.nextImageId = 1;
+
+                    // 清除本地存储
+                    localStorage.removeItem('plateRecognitionData');
+
+                    this.$message.success('已清空所有图片');
+                } catch (error) {
+                    if (error !== 'cancel') {
+                        this.$message.error('清空失败: ' + error.message);
+                    }
+                }
+            },
+
+            // 车牌识别（批量识别）
+            async recognizeAllPlates() {
+                if (this.selectedImages.length === 0) {
+                    try {
+                        await this.$confirm('未选择图片，是否识别所有图片？', '提示', {
+                            confirmButtonText: '识别全部',
+                            cancelButtonText: '取消',
+                            type: 'info'
+                        });
+                        this.toggleSelectAll();
+                        if (this.selectedImages.length === 0) {
+                            return;
+                        }
+                    } catch (error) {
+                        if (error !== 'cancel') {
+                            this.$message.error('识别已取消');
+                        }
+                        return;
+                    }
+                }
+
+                this.recognizeLoading = true;
+
+                try {
+                    // 标记正在识别的图片
+                    this.selectedImages.forEach(img => {
+                        const image = this.imageList.find(i => i.id === img.id);
+                        if (image) {
+                            image.recognizing = true;
+                        }
+                    });
+
+                    // 转换为Base64
+                    const base64Images = [];
+                    const imageIds = [];
+
+                    for (const image of this.selectedImages) {
+                        try {
+                            // 如果是File对象，先读取为DataURL
+                            let dataUrl = image.url;
+                            const base64 = await this.imageToBase64(dataUrl);
+                            if (base64) {
+                                base64Images.push(base64);
+                                imageIds.push(image.id);
+                            } else {
+                                console.warn(`图片 ${image.name} 转换Base64失败`);
+                            }
+                        } catch (error) {
+                            console.error(`处理图片 ${image.name} 失败:`, error);
+                        }
+                    }
+
+                    if (base64Images.length === 0) {
+                        this.$message.error('图片转换Base64失败');
+                        return;
+                    }
+
+                    // 调用识别接口（使用您提供的接口格式）
+                    const response = await axios.post('/api/process/recognize_plates', {
+                        job_id: this.jobId,
+                        image_urls: base64Images,
+                        image_type: 'base64',
+                        vehicle_ids: imageIds.map(id => String(id))  // 转为字符串
+                    });
+
+                    if (response.data.success) {
+                        const results = response.data.results || [];
+
+                        // 更新图片列表中的车牌信息
+                        results.forEach(result => {
+                            const image = this.imageList.find(img => img.id == result.vehicleId);
+                            if (image) {
+                                image.plateNumber = result.plateNumber;
+                                image.plateColor = result.plateColor;
+                                image.vehicleType = result.vehicleType;
+                                image.confidence = result.confidence;
+                                image.recognizing = false;
+                            }
+                        });
+
+                        // 保存到本地存储
+                        this.saveToLocalStorage();
+
+                        this.$message.success(`成功识别 ${results.length} 个车牌`);
+                    } else {
+                        this.$message.error('车牌识别失败: ' + (response.data.message || '未知错误'));
+                    }
+                } catch (error) {
+                    console.error('车牌识别失败:', error);
+                    this.$message.error('车牌识别失败: ' + error.message);
+                } finally {
+                    // 清除识别中状态
+                    this.imageList.forEach(img => {
+                        if (img.recognizing) {
+                            img.recognizing = false;
+                        }
+                    });
+
+                    this.recognizeLoading = false;
+                }
+            },
+
+            // File对象转DataURL
+            fileToDataUrl(file) {
+                return new Promise((resolve, reject) => {
+                    if (!file || !(file instanceof Blob)) {
+                        // 如果是 base64 字符串，直接返回
+                        if (typeof file === 'string' && file.startsWith('data:image')) {
+                            resolve(file);
+                        } else {
+                            reject(new Error('无效的文件对象'));
+                        }
+                        return;
+                    }
+
+                    const reader = new FileReader();
+                    reader.onload = (e) => resolve(e.target.result);
+                    reader.onerror = reject;
+                    reader.readAsDataURL(file);
+                });
+            },
+
+            // 保存所有数据（与您提供的代码一致）
+            async saveData() {
+                this.saveLoading = true;
+
+                try {
+                    // 先检查哪些图片有车牌信息
+                    const imagesWithPlate = this.imageList.filter(image =>
+                        image.plateNumber && image.plateNumber.trim() !== ''
+                    );
+
+                    if (imagesWithPlate.length === 0) {
+                        try {
+                            await this.$confirm('当前没有车牌信息，是否先进行车牌识别？', '提示', {
+                                confirmButtonText: '先识别',
+                                cancelButtonText: '取消保存',
+                                type: 'warning'
+                            });
+                            await this.recognizeAllPlates();
+                            return;
+                        } catch (error) {
+                            if (error !== 'cancel') {
+                                this.$message.error('保存已取消');
+                            }
+                            return;
+                        }
+                    }
+
+                    // 检查是否有选中的图片，如果没有选中的但有车牌信息，就保存所有有车牌信息的
+                    const selectedWithPlate = this.selectedImages.filter(image =>
+                        image.plateNumber && image.plateNumber.trim() !== ''
+                    );
+
+                    const savesToUse = selectedWithPlate.length > 0 ? selectedWithPlate : imagesWithPlate;
+
+                    // 收集图片Base64数据
+                    const capturesWithImages = [];
+                    for (const image of savesToUse) {
+                        try {
+                            if (image.url && image.url.startsWith('data:')) {
+                                // 提取纯base64部分（去掉"data:image/xxx;base64,"前缀）
+                                const base64 = image.url.split(',')[1];
+                                capturesWithImages.push({
+                                    id: String(image.id),
+                                    vehicleId: String(image.id),
+                                    timestamp: new Date().toISOString(),
+                                    plateNumber: image.plateNumber,
+                                    plateColor: image.plateColor || '蓝色',
+                                    vehicleType: image.vehicleType || '小型汽车',
+                                    confidence: image.confidence || 0.0,
+                                    imageData: base64  // 纯base64，没有前缀
+                                });
+                            } else {
+                                console.warn(`图片 ${image.name} 的url格式不正确`);
+                            }
+                        } catch (error) {
+                            console.error(`处理图片 ${image.name} 失败:`, error);
+                            this.$message.warning(`图片 ${image.name} 处理失败，将跳过`);
+                        }
+                    }
+
+                    if (capturesWithImages.length === 0) {
+                        this.$message.error('无法获取任何图片数据，保存失败');
+                        return;
+                    }
+
+                    // 构建要保存的数据（与您提供的格式一致）
+                    const saveData = {
+                        job_id: this.jobId,
+                        violation_type: 'plate_recognition',
+                        original_filename: `车牌识别_${new Date().toLocaleString()}`,
+                        processed_video_url: '',
+                        process_info: {
+                            type: '车牌识别',
+                            violationCount: capturesWithImages.length,
+                            videoDuration: ''
+                        },
+                        captures: capturesWithImages
+                    };
+
+                    // 调用保存接口（使用您提供的接口）
+                    const response = await axios.post('/api/process/save-data', saveData);
+
+                    if (response.data.success) {
+                        // 显示保存的详细信息
+                        if (response.data.data) {
+                            const data = response.data.data;
+                            this.$message.success(
+                                `成功保存了 ${data.carCount || capturesWithImages.length} 个车牌信息`
+                            );
+                        } else {
+                            this.$message.success('保存成功');
+                        }
+
+                        // 保存成功后，可以清除已保存的图片
+                        const savedIds = savesToUse.map(img => String(img.id));
+                        this.imageList = this.imageList.filter(img => !savedIds.includes(String(img.id)));
+                        this.selectedImages = [];
+                        this.saveToLocalStorage();
+
+                    } else {
+                        this.$message.error('保存失败: ' + response.data.message);
+                    }
+                } catch (error) {
+                    console.error('保存出错:', error);
+                    if (error !== 'cancel') {
+                        this.$message.error('保存失败: ' + error.message);
+                    }
+                } finally {
+                    this.saveLoading = false;
+                }
+            },
+
+            // 保存单个车牌识别结果
+            async savePlateResult(result) {
+                try {
+                    const response = await axios.post('/api/save_plate_result', {
+                        job_id: this.jobId,
+                        capture_id: result.captureId || result.vehicleId,
+                        plate_number: result.plateNumber,
+                        confidence: result.confidence
+                    });
+
+                    if (response.data.success) {
+                        this.$message.success('车牌信息已保存');
+                    }
+                } catch (error) {
+                    this.$message.error('保存失败: ' + error.message);
+                }
+            },
+
+            // 格式化文件大小
+            formatFileSize(bytes) {
+                if (bytes === 0) return '0 B';
+                const k = 1024;
+                const sizes = ['B', 'KB', 'MB', 'GB'];
+                const i = Math.floor(Math.log(bytes) / Math.log(k));
+                return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+            },
+
+            // 图片加载错误处理
+            onImageError(event) {
+                event.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTYwIiBoZWlnaHQ9IjEyMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZWVlZWVlIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzk5OSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPkltYWdlIEVycm9yPC90ZXh0Pjwvc3ZnPg==';
+            },
+
+            // 获取置信度颜色类
+            getConfidenceClass(confidence) {
+                if (!confidence) return '';
+                if (confidence >= 90) return 'high';
+                if (confidence >= 70) return 'medium';
+                return 'low';
+            },
+
+            // 查看原图
+            viewOriginalImage(image) {
+                this.previewImageUrl = image.url;
+                this.previewTitle = `${image.name} - ${image.plateNumber || '未识别车牌'}`;
+                this.previewVisible = true;
+            },
+
+            // 下载图片
+            downloadImage() {
+                if (!this.previewImageUrl) return;
+
+                const link = document.createElement('a');
+                link.href = this.previewImageUrl;
+                link.download = this.previewTitle + '.jpg';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+
+                this.$message.success('图片下载已开始');
+            },
+
+            // 拖拽进入
+            onDragOver(event) {
+                event.preventDefault();
+                this.isDragOver = true;
+            },
+
+            // 拖拽离开
+            onDragLeave(event) {
+                event.preventDefault();
+                this.isDragOver = false;
+            },
+
+            // 拖拽释放
+            async onDrop(event) {
+                event.preventDefault();
+                this.isDragOver = false;
+
+                const files = event.dataTransfer.files;
+                if (!files || files.length === 0) return;
+
+                // 遍历所有文件
+                for (const file of files) {
+                    // 验证文件类型
+                    const isImage = /\.(jpg|jpeg|png|gif|bmp)$/i.test(file.name);
+                    if (!isImage) continue;
+
+                    // 调用已有的上传方法
+                    await this.handleUpload({ file });
+                }
+            }
+            
+        }
+    });
+</script>
+</body>
+</html>

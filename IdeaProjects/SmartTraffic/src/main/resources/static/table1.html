@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>车辆列表 - 智慧交通管理系统</title>
+    <link rel="stylesheet" href="css/lib/index.min.css">
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            background: #f5f6fa;
+            font-family: "Microsoft YaHei", sans-serif;
+        }
+        .search-card {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .table-card {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+        }
+        .operate-bar {
+            margin-bottom: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .el-table {
+            --el-table-header-text-color: #333;
+            --el-table-row-hover-bg-color: #f8f9fa;
+        }
+        .status-tag {
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+        .status-online {
+            background: #f0f9ff;
+            color: #1989fa;
+        }
+        .status-offline {
+            background: #fef2f2;
+            color: #f56c6c;
+        }
+        .status-abnormal {
+            background: #fff7e6;
+            color: #e6a23c;
+        }
+        .detail-modal .el-dialog-body {
+            padding: 20px;
+        }
+        .car-info-item {
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+        }
+        .car-info-label {
+            width: 120px;
+            color: #666;
+            font-weight: 500;
+        }
+        .car-info-value {
+            flex: 1;
+            color: #333;
+        }
+    </style>
+</head>
+<body>
+<div id="app">
+    <!-- 搜索筛选区 -->
+    <div class="search-card">
+        <el-form :inline="true" :model="searchForm" class="demo-form-inline">
+            <el-form-item label="车牌号码">
+                <el-input v-model="searchForm.plateNumber" placeholder="请输入车牌号码" clearable></el-input>
+            </el-form-item>
+            <el-form-item label="车辆类型">
+                <el-select v-model="searchForm.vehicleType" placeholder="请选择车辆类型" clearable>
+                    <el-option label="小型车辆" value="小型车辆"></el-option>
+                    <el-option label="大型车辆" value="大型车辆"></el-option>
+                    <el-option label="新能源车辆" value="新能源车辆"></el-option>
+                </el-select>
+            </el-form-item>
+            <el-form-item label="违规类型">
+                <el-select v-model="searchForm.illegalType" placeholder="请选择违规类型" clearable>
+                    <el-option label="闯红灯" value="red_light"></el-option>
+                    <el-option label="逆行" value="wrong_way"></el-option>
+                    <el-option label="压线" value="line_press"></el-option>
+                    <el-option label="违停" value="illegal_parking"></el-option>
+                    <el-option label="未戴头盔" value="helmet"></el-option>
+                </el-select>
+            </el-form-item>
+            <el-form-item>
+                <el-button type="primary" @click="searchCars">搜索</el-button>
+                <el-button @click="resetSearch">重置</el-button>
+            </el-form-item>
+        </el-form>
+    </div>
+
+    <!-- 表格展示区 -->
+    <div class="table-card">
+        <div class="operate-bar">
+            <div>共 <span style="color: #1989fa; font-weight: bold;">{{ total }}</span> 条车辆记录</div>
+            <div>
+                <el-button type="primary" size="small" @click="openStats">统计</el-button>
+                <el-button type="success" size="small" @click="exportCars">导出CSV</el-button>
+                <el-button type="danger" size="small" @click="deleteSelectedCars">批量删除</el-button>
+            </div>
+        </div>
+        <el-table :data="carList" border style="width: 100%" v-loading="loading" @selection-change="handleSelectionChange">
+            <el-table-column type="selection" width="55"></el-table-column>
+            <el-table-column prop="plateNumber" label="车牌号码" width="120"></el-table-column>
+            <el-table-column prop="plateColor" label="车牌颜色" width="120"></el-table-column>
+            <el-table-column prop="vehicleType" label="车辆类型" width="120"></el-table-column>
+            <el-table-column prop="confidence" label="识别置信度" width="120">
+                <template slot-scope="scope">
+                    {{ scope.row.confidence == null ? '-' : scope.row.confidence.toFixed(2) + '%' }}
+                </template>
+            </el-table-column>
+            <el-table-column prop="illegalType" label="违规类型" width="120">
+                <template slot-scope="scope">
+                    <span class="status-tag">{{ getIllegalTypeText(scope.row.illegalType) }}</span>
+                </template>
+            </el-table-column>
+            <el-table-column prop="createdAt" label="记录时间" width="180"></el-table-column>
+            <el-table-column label="操作" width="120">
+                <template slot-scope="scope">
+                    <el-button type="text" @click="viewCarDetail(scope.row)">查看详情</el-button>
+                </template>
+            </el-table-column>
+        </el-table>
+
+        <!-- 分页控件 -->
+        <el-pagination
+                @size-change="handleSizeChange"
+                @current-change="handleCurrentChange"
+                :current-page="currentPage"
+                :page-sizes="[10, 20, 50, 100]"
+                :page-size="pageSize"
+                layout="total, sizes, prev, pager, next, jumper"
+                :total="total"
+                style="margin-top: 20px; text-align: right;">
+        </el-pagination>
+    </div>
+
+    <!-- 车辆详情弹窗 -->
+    <el-dialog title="车辆详情" :visible.sync="detailVisible" width="600px" class="detail-modal">
+        <div v-if="currentCar">
+            <div class="car-info-item">
+                <div class="car-info-label">车牌号码：</div>
+                <div class="car-info-value">{{ currentCar.plateNumber }}</div>
+            </div>
+            <div class="car-info-item">
+                <div class="car-info-label">车牌颜色：</div>
+                <div class="car-info-value">{{ currentCar.plateColor || '-' }}</div>
+            </div>
+            <div class="car-info-item">
+                <div class="car-info-label">车辆类型：</div>
+                <div class="car-info-value">{{ currentCar.vehicleType || '-' }}</div>
+            </div>
+            <div class="car-info-item">
+                <div class="car-info-label">识别置信度：</div>
+                <div class="car-info-value">{{ currentCar.confidence == null ? '-' : currentCar.confidence.toFixed(2) + '%' }}</div>
+            </div>
+            <div class="car-info-item">
+                <div class="car-info-label">违规类型：</div>
+                <div class="car-info-value">{{ getIllegalTypeText(currentCar.illegalType) }}</div>
+            </div>
+            <div class="car-info-item">
+                <div class="car-info-label">记录时间：</div>
+                <div class="car-info-value">{{ currentCar.createdAt || '-' }}</div>
+            </div>
+            <div class="car-info-item">
+                <div class="car-info-label">图片文件：</div>
+                <div class="car-info-value">{{ currentCar.imagePath || '-' }}</div>
+            </div>
+        </div>
+    </el-dialog>
+
+    <!-- 统计弹窗 -->
+    <el-dialog title="车辆统计" :visible.sync="statsVisible" width="900px" @opened="renderStatsCharts">
+        <div style="display: flex; gap: 20px;">
+            <div style="flex: 1;">
+                <div id="carStatsVehicleChart" style="height: 320px;"></div>
+            </div>
+            <div style="flex: 1;">
+                <div id="carStatsIllegalChart" style="height: 320px;"></div>
+            </div>
+        </div>
+    </el-dialog>
+</div>
+
+<script src="js/lib/echarts.min.js"></script>
+<script src="js/lib/vue.min.js"></script>
+<script src="js/lib/index.min.js"></script>
+<script>
+    new Vue({
+        el: '#app',
+        data() {
+            return {
+                searchForm: {
+                    plateNumber: '',
+                    vehicleType: '',
+                    illegalType: ''
+                },
+                carList: [],
+                loading: false,
+                currentPage: 1,
+                pageSize: 10,
+                total: 0,
+                stats: { total: 0, illegalTotal: 0, byIllegalType: [], byVehicleType: [] },
+                selectedCars: [],
+                statsVisible: false,
+                vehicleChart: null,
+                illegalChart: null,
+                // 详情弹窗相关
+                detailVisible: false,
+                currentCar: null
+            }
+        },
+        mounted() {
+            // 页面加载时获取车辆列表
+            this.getCarList();
+        },
+        methods: {
+            // 获取车辆列表
+            getCarList() {
+                this.loading = true;
+                const params = new URLSearchParams({
+                    plateNumber: this.searchForm.plateNumber || '',
+                    vehicleType: this.searchForm.vehicleType || '',
+                    illegalType: this.searchForm.illegalType || '',
+                    page: this.currentPage,
+                    pageSize: this.pageSize
+                });
+                fetch(`/api/cars?${params.toString()}`)
+                    .then(res => res.json())
+                    .then(res => {
+                        if (res.success && res.data) {
+                            this.carList = Array.isArray(res.data.list) ? res.data.list : [];
+                            this.total = res.data.total || 0;
+                            this.selectedCars = [];
+                            if (this.statsVisible) {
+                                this.getStats();
+                            }
+                        } else {
+                            this.$message.error(res.message || '获取车辆列表失败');
+                        }
+                    })
+                    .catch(() => this.$message.error('获取车辆列表异常'))
+                    .finally(() => { this.loading = false; });
+            },
+            // 搜索车辆
+            searchCars() {
+                this.currentPage = 1; // 搜索后重置页码
+                this.getCarList();
+            },
+            // 重置搜索条件
+            resetSearch() {
+                this.searchForm = {
+                    plateNumber: '',
+                    vehicleType: '',
+                    illegalType: ''
+                };
+                this.getCarList();
+            },
+            // 分页大小改变
+            handleSizeChange(val) {
+                this.pageSize = val;
+                this.getCarList();
+            },
+            // 当前页改变
+            handleCurrentChange(val) {
+                this.currentPage = val;
+                this.getCarList();
+            },
+            // 表格选择事件
+            handleSelectionChange(val) {
+                this.selectedCars = val;
+            },
+            // 查看车辆详情
+            viewCarDetail(car) {
+                this.currentCar = car;
+                this.detailVisible = true;
+            },
+            // 批量删除车辆
+            deleteSelectedCars() {
+                if (!this.selectedCars || this.selectedCars.length === 0) {
+                    this.$message.warning('请选择要删除的车辆');
+                    return;
+                }
+                const ids = this.selectedCars.map(item => item.id);
+                this.$confirm(`确定删除选中的 ${ids.length} 条车辆记录吗？`, '提示', { type: 'warning' })
+                    .then(() => {
+                        fetch('/api/cars/delete-batch', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ ids })
+                        })
+                            .then(res => res.json())
+                            .then(res => {
+                                if (res.success) {
+                                    this.$message.success('批量删除成功');
+                                    this.getCarList();
+                                } else {
+                                    this.$message.error(res.message || '批量删除失败');
+                                }
+                            })
+                            .catch(() => this.$message.error('批量删除异常'));
+                    })
+                    .catch(() => {});
+            },
+            // 导出车辆列表
+            exportCars() {
+                const params = new URLSearchParams({
+                    plateNumber: this.searchForm.plateNumber || '',
+                    vehicleType: this.searchForm.vehicleType || '',
+                    illegalType: this.searchForm.illegalType || ''
+                });
+                const url = `/api/cars/export/csv?${params.toString()}`;
+                window.open(url, '_blank');
+            },
+            // 获取统计数据
+            getStats() {
+                const params = new URLSearchParams({
+                    plateNumber: this.searchForm.plateNumber || '',
+                    vehicleType: this.searchForm.vehicleType || '',
+                    illegalType: this.searchForm.illegalType || ''
+                });
+                fetch(`/api/cars/stats?${params.toString()}`)
+                    .then(res => res.json())
+                    .then(res => {
+                        if (res.success && res.data) {
+                            this.stats = res.data;
+                            this.renderStatsCharts();
+                        }
+                    })
+                    .catch(() => {});
+            },
+            openStats() {
+                this.statsVisible = true;
+                this.getStats();
+            },
+            renderStatsCharts() {
+                this.$nextTick(() => {
+                    if (typeof echarts === 'undefined') return;
+                    const vehicleEl = document.getElementById('carStatsVehicleChart');
+                    const illegalEl = document.getElementById('carStatsIllegalChart');
+                    if (vehicleEl) {
+                        if (!this.vehicleChart) {
+                            this.vehicleChart = echarts.init(vehicleEl);
+                        }
+                        const data = Array.isArray(this.stats.byVehicleType) ? this.stats.byVehicleType : [];
+                        const option = {
+                            title: { text: '车辆类型分布', left: 'center', top: 5, textStyle: { fontSize: 14 } },
+                            tooltip: { trigger: 'item' },
+                            legend: { bottom: 0, type: 'scroll' },
+                            series: [
+                                {
+                                    name: '车辆类型',
+                                    type: 'pie',
+                                    radius: ['35%', '65%'],
+                                    data: data.map(item => ({ name: item.name === 'unknown' ? '未知' : item.name, value: item.value })),
+                                    label: { formatter: '{b} {c}' }
+                                }
+                            ]
+                        };
+                        if (!data.length) {
+                            option.series[0].data = [{ name: '暂无数据', value: 0 }];
+                        }
+                        this.vehicleChart.setOption(option);
+                    }
+                    if (illegalEl) {
+                        if (!this.illegalChart) {
+                            this.illegalChart = echarts.init(illegalEl);
+                        }
+                        const data = Array.isArray(this.stats.byIllegalType) ? this.stats.byIllegalType : [];
+                        const option = {
+                            title: { text: '违规类型分布（含无违规）', left: 'center', top: 5, textStyle: { fontSize: 14 } },
+                            tooltip: { trigger: 'item' },
+                            legend: { bottom: 0, type: 'scroll' },
+                            series: [
+                                {
+                                    name: '违规类型',
+                                    type: 'pie',
+                                    radius: ['35%', '65%'],
+                                    data: data.map(item => ({
+                                        name: item.name === 'none' ? '无违规' : this.getIllegalTypeText(item.name),
+                                        value: item.value
+                                    })),
+                                    label: { formatter: '{b} {c}' }
+                                }
+                            ]
+                        };
+                        if (!data.length) {
+                            option.series[0].data = [{ name: '暂无数据', value: 0 }];
+                        }
+                        this.illegalChart.setOption(option);
+                    }
+                });
+            },
+            getIllegalTypeText(type) {
+                const map = {
+                    red_light: '闯红灯',
+                    wrong_way: '逆行',
+                    line_press: '压线',
+                    illegal_parking: '违停',
+                    helmet: '未戴头盔'
+                };
+                if (!type) return '无';
+                return map[type] || type;
+            }
+        }
+    });
+</script>
+</body>
+</html>

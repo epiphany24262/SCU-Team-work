@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>消息中心 - 智慧交通监控系统</title>
+    <!-- 基础样式 -->
+    <link rel="stylesheet" href="css/base.css">
+    <!-- 字体图标库 -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- 消息中心样式 -->
+    <link rel="stylesheet" href="css/message.css">
+    <!-- 通用重置样式 -->
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+    </style>
+</head>
+<body>
+<div class="message-container">
+    <!-- 头部 -->
+    <div class="message-header">
+        <a href="home.html" class="back-button">
+            <i class="fas fa-arrow-left"></i> 返回首页
+        </a>
+
+        <div class="header-title">
+            <h1>消息中心</h1>
+            <p>查看和管理所有系统通知与报警信息</p>
+        </div>
+
+        <div class="message-actions">
+            <button class="action-button" id="markAllRead">
+                <i class="fas fa-check-double"></i> 全部标记已读
+            </button>
+            <button class="action-button delete" id="deleteSelected">
+                <i class="fas fa-trash-alt"></i> 删除选中
+            </button>
+            <button class="action-button" id="refreshMessages">
+                <i class="fas fa-rotate"></i> 刷新
+            </button>
+            <button class="action-button" id="exportMessages">
+                <i class="fas fa-file-export"></i> 导出
+            </button>
+            <button class="action-button delete" id="clearAll">
+                <i class="fas fa-trash"></i> 清空
+            </button>
+        </div>
+    </div>
+
+    <!-- 消息统计 -->
+    <div class="message-stats">
+        <div class="stat-card">
+            <div class="stat-icon all">
+                <i class="fas fa-envelope-open-text"></i>
+            </div>
+            <div class="stat-info">
+                <h3>全部消息</h3>
+                <div class="count">24</div>
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-icon unread">
+                <i class="fas fa-envelope"></i>
+            </div>
+            <div class="stat-info">
+                <h3>未读消息</h3>
+                <div class="count">3</div>
+            </div>
+        </div>
+
+        <div class="stat-card admin-only">
+            <div class="stat-icon alert">
+                <i class="fas fa-exclamation-circle"></i>
+            </div>
+            <div class="stat-info">
+                <h3>违规车辆</h3>
+                <div class="count">8</div>
+            </div>
+        </div>
+
+        <div class="stat-card admin-only">
+            <div class="stat-icon system">
+                <i class="fas fa-cog"></i>
+            </div>
+            <div class="stat-info">
+                <h3>系统日志</h3>
+                <div class="count">5</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 管理员发布面板 -->
+    <div class="compose-card" id="adminCompose">
+        <div class="compose-header">
+            <h2>管理员消息发布</h2>
+            <span class="compose-tip">支持公告与单用户消息，发送后即时同步到消息中心</span>
+        </div>
+        <div class="compose-grid">
+            <div class="compose-field">
+                <label>发送范围</label>
+                <div class="scope-toggle" id="scopeToggle">
+                    <button class="scope-btn active" data-scope="all">
+                        <i class="fas fa-bullhorn"></i> 全体公告
+                    </button>
+                    <button class="scope-btn" data-scope="user">
+                        <i class="fas fa-user"></i> 指定用户
+                    </button>
+                </div>
+            </div>
+            <div class="compose-field" id="receiverField" style="display: none;">
+                <label>接收用户</label>
+                <select id="receiverSelect"></select>
+            </div>
+            <div class="compose-field">
+                <label>消息级别</label>
+                <select id="messageLevel">
+                    <option value="info">通知</option>
+                    <option value="warning">提醒</option>
+                    <option value="alert">紧急</option>
+                    <option value="success">成功</option>
+                </select>
+            </div>
+            <div class="compose-field full">
+                <label>消息标题</label>
+                <input type="text" id="messageTitle" placeholder="请输入消息标题">
+            </div>
+            <div class="compose-field full">
+                <label>消息内容</label>
+                <textarea id="messageContent" rows="4" placeholder="请输入消息内容"></textarea>
+            </div>
+        </div>
+        <div class="compose-actions">
+            <button class="primary" id="sendMessageBtn">
+                <i class="fas fa-paper-plane"></i> 发送消息
+            </button>
+            <button class="ghost" id="clearComposeBtn">
+                <i class="fas fa-eraser"></i> 清空内容
+            </button>
+        </div>
+    </div>
+
+    <!-- 消息列表 -->
+    <div class="message-list-container">
+        <div class="list-header">
+            <h2>所有消息</h2>
+            <div class="search-box">
+                <input type="text" id="searchInput" placeholder="搜索消息标题或内容...">
+                <i class="fas fa-search"></i>
+            </div>
+            <div class="sort-options">
+                <select id="sortSelect" class="sort-select">
+                    <option value="time-desc">最新在前</option>
+                    <option value="time-asc">最旧在前</option>
+                    <option value="unread-first">未读优先</option>
+                    <option value="starred-first">重要优先</option>
+                </select>
+            </div>
+            <div class="filter-options">
+                <button class="filter-button active" data-filter="all">全部</button>
+                <button class="filter-button" data-filter="unread">未读</button>
+                <button class="filter-button" data-filter="announcements">公告</button>
+                <button class="filter-button" data-filter="direct">私信</button>
+                <button class="filter-button admin-only" data-filter="logs">系统日志</button>
+                <button class="filter-button admin-only" data-filter="violations">违规车辆</button>
+            </div>
+        </div>
+        <div class="message-items" id="messageItems">
+            <!-- 消息项将通过JavaScript动态生成 -->
+        </div>
+
+        <div class="pagination" id="pagination"></div>
+    </div>
+</div>
+
+<script src="js/message.js"></script>
+</body>
+</html>

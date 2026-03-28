@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>个人中心</title>
+    <link rel="stylesheet" href="css/lib/index.min.css">
+    <link rel="stylesheet" href="css/base.css">
+    <style>
+        body {
+            background: #f5f7fb;
+            padding: 20px;
+            font-family: "Microsoft YaHei", sans-serif;
+        }
+        .card {
+            max-width: 720px;
+            margin: 0 auto;
+            background: #fff;
+            border-radius: 8px;
+            padding: 24px;
+            box-shadow: 0 6px 16px rgba(0,0,0,0.08);
+        }
+        .card h2 {
+            margin-bottom: 16px;
+            color: #2a5298;
+        }
+        .form-group {
+            margin-bottom: 16px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 6px;
+            color: #333;
+            font-weight: 500;
+        }
+        .form-control {
+            width: 100%;
+            height: 40px;
+            padding: 0 12px;
+            border: 1px solid #dcdfe6;
+            border-radius: 6px;
+        }
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+        .actions {
+            display: flex;
+            gap: 12px;
+            margin-top: 10px;
+        }
+        .btn {
+            height: 40px;
+            border: none;
+            border-radius: 6px;
+            padding: 0 18px;
+            cursor: pointer;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: #fff;
+        }
+        .btn-secondary {
+            background: #f0f2f5;
+            color: #333;
+        }
+        .hint {
+            font-size: 12px;
+            color: #999;
+        }
+        .error {
+            color: #f56c6c;
+            font-size: 12px;
+            margin-top: 6px;
+        }
+        @media (max-width: 640px) {
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+<div class="card">
+    <h2>个人中心</h2>
+    <div class="form-group">
+        <label>用户名</label>
+        <input type="text" id="username" class="form-control" disabled>
+        <div class="hint">用户名不可修改</div>
+    </div>
+    <div class="form-group">
+        <label>角色</label>
+        <input type="text" id="roleName" class="form-control" disabled>
+    </div>
+    <div class="form-row">
+        <div class="form-group">
+            <label>姓名</label>
+            <input type="text" id="realName" class="form-control" placeholder="请输入姓名">
+        </div>
+        <div class="form-group">
+            <label>手机号</label>
+            <input type="text" id="phone" class="form-control" placeholder="请输入手机号">
+        </div>
+    </div>
+    <div class="form-group">
+        <label>邮箱</label>
+        <input type="text" id="email" class="form-control" placeholder="请输入邮箱">
+    </div>
+    <div class="error" id="profileError"></div>
+    <div class="actions">
+        <button class="btn btn-primary" onclick="saveProfile()">保存</button>
+        <button class="btn btn-secondary" onclick="reloadProfile()">刷新</button>
+    </div>
+</div>
+
+<script>
+    function getLocalUser() {
+        const userData = localStorage.getItem('traffic_user');
+        if (!userData) return null;
+        try { return JSON.parse(userData); } catch (e) { return null; }
+    }
+
+    async function reloadProfile() {
+        const user = getLocalUser();
+        if (!user) {
+            window.location.href = 'login.html';
+            return;
+        }
+        document.getElementById('profileError').textContent = '';
+
+        document.getElementById('username').value = user.username || '';
+        document.getElementById('roleName').value = user.roleName || (user.role === 'manager' ? '管理员' : '普通用户');
+
+        try {
+            const response = await fetch(`/api/auth/profile?username=${encodeURIComponent(user.username)}`);
+            const result = await response.json();
+            if (result.success && result.data) {
+                document.getElementById('realName').value = result.data.realName || '';
+                document.getElementById('phone').value = result.data.phone || '';
+                document.getElementById('email').value = result.data.email || '';
+                document.getElementById('roleName').value = result.data.roleName || document.getElementById('roleName').value;
+            } else {
+                document.getElementById('profileError').textContent = result.message || '加载失败';
+            }
+        } catch (e) {
+            document.getElementById('profileError').textContent = '加载异常，请检查网络或服务状态';
+        }
+    }
+
+    async function saveProfile() {
+        const user = getLocalUser();
+        if (!user) {
+            window.location.href = 'login.html';
+            return;
+        }
+        const realName = document.getElementById('realName').value.trim();
+        const phone = document.getElementById('phone').value.trim();
+        const email = document.getElementById('email').value.trim();
+        const profileError = document.getElementById('profileError');
+        profileError.textContent = '';
+
+        try {
+            const response = await fetch('/api/auth/profile', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    username: user.username,
+                    realName,
+                    phone,
+                    email
+                })
+            });
+            const result = await response.json();
+            if (result.success) {
+                profileError.textContent = '保存成功';
+                profileError.style.color = '#67c23a';
+            } else {
+                profileError.textContent = result.message || '保存失败';
+                profileError.style.color = '#f56c6c';
+            }
+        } catch (e) {
+            profileError.textContent = '保存异常，请检查网络或服务状态';
+            profileError.style.color = '#f56c6c';
+        }
+    }
+
+    window.onload = reloadProfile;
+</script>
+</body>
+</html>

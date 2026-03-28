@@ -1,0 +1,1296 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>车辆监控 - 智慧交通</title>
+    <link rel="stylesheet" href="css/lib/index.min.css">
+    <link rel="stylesheet" href="css/carContrl.css">
+</head>
+<body>
+<div id="app">
+    <!-- 内容区域 -->
+    <div class="container">
+        <div class="page-title">
+            <i class="el-icon-monitor"></i>
+            <span>车辆监控 - 媒体文件模拟</span>
+        </div>
+
+        <div class="monitor-layout">
+            <!-- 左侧文件列表 -->
+            <div class="file-panel">
+                <el-card>
+                    <div slot="header" class="panel-header">
+                        <span>文件管理</span>
+                    </div>
+                    <el-row :gutter="10" class="upload-header">
+                        <el-col :span="8">
+                            <el-upload
+                                    action="/api/upload"
+                                    :on-success="handleUploadSuccess"
+                                    :before-upload="beforeUpload"
+                                    :show-file-list="false"
+                                    :file-list="fileList"
+                                    multiple
+                                    accept="video/*,image/*">
+                                <el-button size="small" type="primary">点击上传</el-button>
+                            </el-upload>
+                        </el-col>
+                        <el-col :span="8">
+                            <el-button
+                                    size="small"
+                                    @click="refreshFiles"
+                                    :loading="refreshLoading"
+                                    type="default">
+                                <i class="el-icon-refresh"></i>
+                                刷新列表
+                            </el-button>
+                        </el-col>
+                    </el-row>
+                    <div class="el-upload__tip" style="margin-top: 10px;">可上传视频/图片文件，模拟摄像头画面</div>
+                    <div class="file-list">
+                        <div class="list-title">媒体文件列表</div>
+                        <el-tree
+                                :data="mediaTree"
+                                :props="treeProps"
+                                @node-click="handleNodeClick"
+                                accordion>
+                        </el-tree>
+                    </div>
+                </el-card>
+            </div>
+
+            <!-- 右侧视频播放区域 -->
+            <div class="video-panel">
+                <el-card>
+                    <div slot="header" class="video-header">
+                        <span>{{ currentVideo.name || '视频预览' }}</span>
+                        <div class="video-controls">
+                            <el-button v-if="currentVideo.type === 'video'" @click="togglePlay" size="small">
+                                {{ isPlaying ? '暂停' : '播放' }}
+                            </el-button>
+                            <el-button
+                                    v-if="currentVideo.type === 'image'"
+                                    @click="recognizePlate"
+                                    :loading="recognizeLoading"
+                                    type="primary"
+                                    size="small">
+                                车牌识别
+                            </el-button>
+                            <el-dropdown
+                                    v-if="currentVideo.type === 'video'"
+                                    @command="handleViolationCommand"
+                                    placement="bottom-start">
+                                <el-button type="success" size="small" :loading="hasViolationLoading">
+                                    违规检测<i class="el-icon-arrow-down el-icon--right"></i>
+                                </el-button>
+                                <el-dropdown-menu slot="dropdown">
+                                    <el-dropdown-item :disabled="violationLoading.redLight" command="red_light">
+                                        红绿灯检测
+                                    </el-dropdown-item>
+                                    <el-dropdown-item :disabled="violationLoading.wrongWay" command="wrong_way">
+                                        逆行检测
+                                    </el-dropdown-item>
+                                    <el-dropdown-item :disabled="violationLoading.linePress" command="line_press">
+                                        压线检测
+                                    </el-dropdown-item>
+                                    <el-dropdown-item :disabled="violationLoading.helmet" command="helmet">
+                                        头盔检测
+                                    </el-dropdown-item>
+                                    <el-dropdown-item :disabled="violationLoading.illegalParking" command="illegal_parking">
+                                        违停检测
+                                    </el-dropdown-item>
+                                </el-dropdown-menu>
+                            </el-dropdown>
+                            <el-button
+                                    v-if="currentVideo.type === 'video'"
+                                    @click="trafficFlow"
+                                    :loading="trafficFlowLoading"
+                                    type="warning"
+                                    size="small">
+                                车流量统计
+                            </el-button>
+                            <el-button @click="downloadFile" size="small">下载</el-button>
+                            <el-button @click="deleteFile" type="danger" size="small">删除</el-button>
+                        </div>
+                    </div>
+
+                        <div class="video-container">
+                        <img
+                            v-if="streamActive"
+                            :src="streamUrl"
+                            class="video-player"
+                            alt="实时检测预览"
+                            @error="handleStreamError">
+                        <video
+                            v-else-if="currentVideo.type === 'video'"
+                            ref="videoPlayer"
+                            :src="currentVideo.url"
+                            controls
+                            class="video-player"
+                            @loadedmetadata="onVideoLoad"
+                            @error="onVideoError">
+                        </video>
+                        <img
+                            v-else-if="currentVideo.type === 'image'"
+                            :src="currentVideo.url"
+                            class="image-preview"
+                            alt="图片预览">
+                        <div v-else class="no-video">
+                            <i class="el-icon-video-camera"></i>
+                            <p>请从左侧选择文件进行预览</p>
+                        </div>
+                        </div>
+                </el-card>
+            </div>
+        </div>
+    </div>
+</div>
+</body>
+<script src="js/lib/vue.min.js"></script>
+<script src="js/lib/index.min.js"></script>
+<script src="js/lib/axios.min.js"></script>
+<script>
+    new Vue({
+        el: '#app',
+        data() {
+            return {
+                fileList: [],
+                mediaTree: [],
+                treeProps: {
+                    children: 'children',
+                    label: 'label'
+                },
+                currentVideo: {},
+                isPlaying: false,
+                uploadLoading: false,
+                refreshLoading: false,
+                recognizeLoading: false,
+                recognizeResult: null,
+                violationLoading: {
+                    redLight: false,
+                    wrongWay: false,
+                    linePress: false,
+                    helmet: false,
+                    illegalParking: false
+                },
+                trafficFlowLoading: false,
+                trafficFlowResult: null,
+                pythonApiBaseUrl: 'http://localhost:8000', // Python 服务地址
+                springApiBaseUrl: '/api', // Spring Boot 服务地址
+                videoObjectUrl: null,
+                videoRetrying: false,
+                streamActive: false,
+                streamUrl: '',
+                streamJobId: '',
+            }
+        },
+        computed: {
+            hasViolationLoading() {
+                return Object.values(this.violationLoading).some(Boolean);
+            }
+        },
+        mounted() {
+            this.loadMediaFiles().then(() => {
+                this.handleAutoPlayFromQuery();
+            });
+        },
+        methods: {
+            handleAutoPlayFromQuery() {
+                const params = new URLSearchParams(window.location.search);
+                const streamFlag = params.get('stream');
+                const streamType = params.get('type');
+                const streamJobId = params.get('job_id');
+                const streamUrl = params.get('stream_url');
+                const originalName = params.get('filename') || '未命名视频';
+                if (streamFlag === '1' && streamType === 'line_press' && streamJobId && streamUrl) {
+                    this.attachLinePressStream(streamJobId, decodeURIComponent(streamUrl), originalName);
+                    return;
+                }
+                const autoPlay = params.get('autoplay');
+                const fileName = params.get('file');
+                if (autoPlay && fileName) {
+                    this.refreshFiles().then(() => {
+                        this.findAndPlayNewVideo(fileName);
+                    });
+                }
+            },
+            async attachLinePressStream(jobId, streamUrl, originalName) {
+                this.streamJobId = jobId;
+                this.streamUrl = streamUrl;
+                this.streamActive = true;
+
+                const apiBaseUrl = streamUrl.includes('/api/line_press/stream')
+                    ? streamUrl.split('/api/line_press/stream')[0]
+                    : 'http://localhost:8002';
+
+                const result = await this.pollLinePressResult(apiBaseUrl, jobId);
+                this.streamActive = false;
+
+                if (result.status === 'done' && result.processed_url) {
+                    const processedRel = result.processed_url;
+                    const processedUrl = apiBaseUrl + processedRel;
+                    const detailUrl = `process_detail.html?job_id=${jobId}&type=line_press&video_url=${encodeURIComponent(processedUrl)}&filename=${encodeURIComponent(originalName)}`;
+
+                    const ext = (processedRel.split('.').pop() || '').toLowerCase();
+                    const mimeMap = {
+                        mp4: "video/mp4",
+                        avi: "video/x-msvideo",
+                        mov: "video/quicktime",
+                        mkv: "video/x-matroska"
+                    };
+
+                    const processedResponse = await fetch(processedUrl);
+                    const processedBlob = await processedResponse.blob();
+
+                    const outName = `line_press.mp4`;
+                    const outType = mimeMap[ext] || processedBlob.type || "video/mp4";
+
+                    if (ext && ext !== "mp4") {
+                        this.$message.warning(`处理后视频为 .${ext}，浏览器可能无法播放。建议让后端输出 MP4。`);
+                    }
+
+                    const processedFile = new File([processedBlob], outName, { type: outType });
+
+                    const uploadFormData = new FormData();
+                    uploadFormData.append('file', processedFile);
+                    const uploadResult = await axios.post('/api/upload', uploadFormData);
+
+                    if (uploadResult.data && uploadResult.data.success) {
+                        this.$message.success(`压线检测完成并上传！`);
+                        await this.loadMediaFiles();
+                        setTimeout(() => {
+                            this.findAndPlayNewVideo(outName);
+                        }, 800);
+                        window.location.href = detailUrl;
+                    } else {
+                        this.$message.warning(`压线检测完成，但上传到服务器失败`);
+                        window.location.href = detailUrl;
+                    }
+                } else if (result.status === 'failed') {
+                    this.$message.error(`压线检测失败: ` + (result.error || '未知错误'));
+                } else {
+                    this.$message.warning(`压线检测结束，但未生成结果视频`);
+                }
+            },
+            handleViolationCommand(command) {
+                const map = {
+                    red_light: { key: 'redLight', label: '红绿灯检测', baseUrl: 'http://localhost:8000' },
+                    wrong_way: { key: 'wrongWay', label: '逆行检测', baseUrl: 'http://localhost:8001' },
+                    line_press: { key: 'linePress', label: '压线检测', baseUrl: 'http://localhost:8002' },
+                    helmet: { key: 'helmet', label: '头盔检测', baseUrl: 'http://localhost:8003' },
+                    illegal_parking: { key: 'illegalParking', label: '违停检测', baseUrl: 'http://localhost:8004' }
+                };
+                const item = map[command];
+                if (!item) return;
+                this.runViolationDetection(command, item.key, item.label, item.baseUrl);
+            },
+            // 图片车牌识别
+            async recognizePlate() {
+                this.recognizeLoading = true;
+                try {
+                    const response = await fetch(this.currentVideo.url);
+                    const blob = await response.blob();
+                    const file = new File([blob], "plate.jpg", { type: "image/jpeg" });
+
+                    const formData = new FormData();
+                    formData.append('file', file);
+
+                    const result = await axios.post('http://localhost:8000/api/recognize', formData);
+
+                    if (result.data.success) {
+                        this.$alert(`
+                        <div>
+                            <p>识别结果: ${result.data.plates.join(', ')}</p>
+                            <img src="http://localhost:8000${result.data.result_image_url}" style="max-width: 100%; margin-top: 10px;">
+                        </div>
+                    `, '识别成功', {
+                            dangerouslyUseHTMLString: true,
+                            confirmButtonText: '确定'
+                        });
+                    }
+                } catch (error) {
+                    this.$message.error('识别失败: ' + error.message);
+                } finally {
+                    this.recognizeLoading = false;
+                }
+            },
+
+            // 违规检测（基于现有"处理视频"流程）
+            async runViolationDetection(violationType, loadingKey, actionLabel, baseUrlOverride) {
+                if (!this.currentVideo.url || this.currentVideo.type !== 'video') {
+                    this.$message.warning('请先选择一个视频文件');
+                    return;
+                }
+
+                if (violationType === 'wrong_way') {
+                    await this.runWrongWayRealtime(loadingKey, actionLabel, baseUrlOverride);
+                    return;
+                }
+                if (violationType === 'line_press') {
+                    await this.runLinePressRealtime(loadingKey, actionLabel, baseUrlOverride);
+                    return;
+                }
+                if (violationType === 'illegal_parking') {
+                    await this.runIllegalParkingRealtime(loadingKey, actionLabel, baseUrlOverride);
+                    return;
+                }
+
+                this.violationLoading[loadingKey] = true;
+                this.$message.info(`${actionLabel}处理中，请稍候...`);
+
+                try {
+                    const apiBaseUrl = baseUrlOverride || this.pythonApiBaseUrl;
+                    // 1) 获取原始视频文件（保持原始文件名/类型）
+                    const response = await fetch(this.currentVideo.url);
+                    const blob = await response.blob();
+                    const originalName = this.currentVideo.name || "video";
+                    const file = new File([blob], originalName, { type: blob.type || "video/*" });
+
+                    const formData = new FormData();
+                    formData.append('file', file);
+                    formData.append('violation_type', violationType);
+
+                    // 2) 调用 Python 违规检测接口（复用处理视频接口）
+                    const result = await axios.post(`${apiBaseUrl}/api/process_video`, formData);
+
+                    if (result.data) {
+                        const needAnno = result.data.need_annotation ||
+                            result.data.message === 'annotation_required' ||
+                            result.data.detail === 'annotation_required' ||
+                            result.data.annotate_url;
+                        if (needAnno) {
+                            const returnUrl = encodeURIComponent(window.location.origin + '/carControl.html');
+                            window.location.href = `/annotate.html?v=2&return=${returnUrl}`;
+                            return;
+                        }
+                    }
+
+                    if (result.data && result.data.success) {
+                        const processedRel = result.data.processed_url;
+                        const processedUrl = apiBaseUrl + processedRel;
+
+                        // 跳转---2025.12.23Bu
+                        const jobId = result.data.job_id || Date.now().toString();
+                        const detailUrl = `process_detail.html?job_id=${jobId}&type=${violationType}&video_url=${encodeURIComponent(processedUrl)}&filename=${encodeURIComponent(originalName)}`;
+                        window.location.href = detailUrl;
+
+                        // 3) 识别后缀，决定 mime/文件名
+                        const ext = (processedRel.split('.').pop() || '').toLowerCase();
+                        const mimeMap = {
+                            mp4: "video/mp4",
+                            avi: "video/x-msvideo",
+                            mov: "video/quicktime",
+                            mkv: "video/x-matroska"
+                        };
+
+                        const processedResponse = await fetch(processedUrl);
+                        const processedBlob = await processedResponse.blob();
+
+                        const outName = `${violationType}.mp4`;
+                        const outType = mimeMap[ext] || processedBlob.type || "video/mp4";
+
+                        if (ext && ext !== "mp4") {
+                            this.$message.warning(`处理后视频为 .${ext}，浏览器可能无法播放。建议让后端输出 MP4。`);
+                        }
+
+                        const processedFile = new File([processedBlob], outName, { type: outType });
+
+                        // 4) 上传处理后的视频到 Spring Boot
+                        const uploadFormData = new FormData();
+                        uploadFormData.append('file', processedFile);
+                        const uploadResult = await axios.post('/api/upload', uploadFormData);
+
+                        if (uploadResult.data && uploadResult.data.success) {
+                            this.$message.success(`${actionLabel}完成并上传！`);
+                            await this.loadMediaFiles();
+
+                            // 尝试自动定位并播放新视频
+                            setTimeout(() => {
+                                this.findAndPlayNewVideo(outName);
+                            }, 800);
+                        } else {
+                            this.$message.warning(`${actionLabel}完成，但上传到服务器失败`);
+                        }
+                    } else {
+                        this.$message.error(result.data?.message || `${actionLabel}失败`);
+                    }
+                } catch (error) {
+                    const resp = error.response && error.response.data ? error.response.data : null;
+                    const needAnno = resp && (
+                        resp.need_annotation ||
+                        resp.message === 'annotation_required' ||
+                        resp.detail === 'annotation_required' ||
+                        resp.annotate_url
+                    );
+                    if (needAnno) {
+                        const returnUrl = encodeURIComponent(window.location.origin + '/carControl.html');
+                        window.location.href = `/annotate.html?v=2&return=${returnUrl}`;
+                        return;
+                    }
+                    this.$message.error(`${actionLabel}失败: ` + (error.response?.data?.detail || error.message));
+                } finally {
+                    this.violationLoading[loadingKey] = false;
+                }
+            },
+            async runWrongWayRealtime(loadingKey, actionLabel, baseUrlOverride) {
+                this.violationLoading[loadingKey] = true;
+                this.$message.info(`${actionLabel}处理中，已开启实时播放...`);
+
+                try {
+                    const violationType = 'wrong_way';
+                    const apiBaseUrl = baseUrlOverride || this.pythonApiBaseUrl;
+
+                    const response = await fetch(this.currentVideo.url);
+                    const blob = await response.blob();
+                    const originalName = this.currentVideo.name || "video";
+                    const file = new File([blob], originalName, { type: blob.type || "video/*" });
+
+                    const formData = new FormData();
+                    formData.append('file', file);
+
+                    const startResp = await axios.post(`${apiBaseUrl}/api/wrong_way/start`, formData);
+                    if (!startResp.data || !startResp.data.success) {
+                        throw new Error(startResp.data?.message || '启动实时检测失败');
+                    }
+
+                    const jobId = startResp.data.job_id;
+                    this.streamJobId = jobId;
+                    this.streamUrl = apiBaseUrl + startResp.data.stream_url;
+                    this.streamActive = true;
+
+                    const result = await this.pollWrongWayResult(apiBaseUrl, jobId);
+                    this.streamActive = false;
+
+                    if (result.status === 'done' && result.processed_url) {
+                        const processedRel = result.processed_url;
+                        const processedUrl = apiBaseUrl + processedRel;
+                        const detailUrl = `process_detail.html?job_id=${jobId}&type=${violationType}&video_url=${encodeURIComponent(processedUrl)}&filename=${encodeURIComponent(originalName)}`;
+
+                        const ext = (processedRel.split('.').pop() || '').toLowerCase();
+                        const mimeMap = {
+                            mp4: "video/mp4",
+                            avi: "video/x-msvideo",
+                            mov: "video/quicktime",
+                            mkv: "video/x-matroska"
+                        };
+
+                        const processedResponse = await fetch(processedUrl);
+                        const processedBlob = await processedResponse.blob();
+
+                        const outName = `${violationType}.mp4`;
+                        const outType = mimeMap[ext] || processedBlob.type || "video/mp4";
+
+                        if (ext && ext !== "mp4") {
+                            this.$message.warning(`处理后视频为 .${ext}，浏览器可能无法播放。建议让后端输出 MP4。`);
+                        }
+
+                        const processedFile = new File([processedBlob], outName, { type: outType });
+
+                        const uploadFormData = new FormData();
+                        uploadFormData.append('file', processedFile);
+                        const uploadResult = await axios.post('/api/upload', uploadFormData);
+
+                        if (uploadResult.data && uploadResult.data.success) {
+                            this.$message.success(`${actionLabel}完成并上传！`);
+                            await this.loadMediaFiles();
+                            setTimeout(() => {
+                                this.findAndPlayNewVideo(outName);
+                            }, 800);
+                            window.location.href = detailUrl;
+                        } else {
+                            this.$message.warning(`${actionLabel}完成，但上传到服务器失败`);
+                            window.location.href = detailUrl;
+                        }
+                    } else if (result.status === 'failed') {
+                        this.$message.error(`${actionLabel}失败: ` + (result.error || '未知错误'));
+                    } else {
+                        this.$message.warning(`${actionLabel}结束，但未生成结果视频`);
+                    }
+                } catch (error) {
+                    this.streamActive = false;
+                    if (error.response?.status === 404) {
+                        this.$message.error(`${actionLabel}失败: 实时接口404，请确认逆行检测服务已重启并支持 /api/wrong_way/start 与 /api/wrong_way/stream`);
+                    } else {
+                        this.$message.error(`${actionLabel}失败: ` + (error.response?.data?.detail || error.message));
+                    }
+                } finally {
+                    this.violationLoading[loadingKey] = false;
+                }
+            },
+            async runLinePressRealtime(loadingKey, actionLabel, baseUrlOverride) {
+                this.violationLoading[loadingKey] = true;
+                this.$message.info(`${actionLabel}处理中，已开启实时播放...`);
+
+                try {
+                    const violationType = 'line_press';
+                    const apiBaseUrl = baseUrlOverride || this.pythonApiBaseUrl;
+
+                    const response = await fetch(this.currentVideo.url);
+                    const blob = await response.blob();
+                    const originalName = this.currentVideo.name || "video";
+                    const file = new File([blob], originalName, { type: blob.type || "video/*" });
+
+                    const formData = new FormData();
+                    formData.append('file', file);
+
+                    const startResp = await axios.post(`${apiBaseUrl}/api/line_press/start`, formData);
+                    if (startResp.data && startResp.data.need_annotation) {
+                        const returnUrl = encodeURIComponent(window.location.origin + '/carControl.html');
+                        window.location.href = `/annotate.html?v=2&return=${returnUrl}`;
+                        return;
+                    }
+                    if (!startResp.data || !startResp.data.success) {
+                        throw new Error(startResp.data?.message || '启动实时检测失败');
+                    }
+
+                    const jobId = startResp.data.job_id;
+                    this.streamJobId = jobId;
+                    this.streamUrl = apiBaseUrl + startResp.data.stream_url;
+                    this.streamActive = true;
+
+                    const result = await this.pollLinePressResult(apiBaseUrl, jobId);
+                    this.streamActive = false;
+
+                    if (result.status === 'done' && result.processed_url) {
+                        const processedRel = result.processed_url;
+                        const processedUrl = apiBaseUrl + processedRel;
+                        const detailUrl = `process_detail.html?job_id=${jobId}&type=${violationType}&video_url=${encodeURIComponent(processedUrl)}&filename=${encodeURIComponent(originalName)}`;
+
+                        const ext = (processedRel.split('.').pop() || '').toLowerCase();
+                        const mimeMap = {
+                            mp4: "video/mp4",
+                            avi: "video/x-msvideo",
+                            mov: "video/quicktime",
+                            mkv: "video/x-matroska"
+                        };
+
+                        const processedResponse = await fetch(processedUrl);
+                        const processedBlob = await processedResponse.blob();
+
+                        const outName = `${violationType}.mp4`;
+                        const outType = mimeMap[ext] || processedBlob.type || "video/mp4";
+
+                        if (ext && ext !== "mp4") {
+                            this.$message.warning(`处理后视频为 .${ext}，浏览器可能无法播放。建议让后端输出 MP4。`);
+                        }
+
+                        const processedFile = new File([processedBlob], outName, { type: outType });
+
+                        const uploadFormData = new FormData();
+                        uploadFormData.append('file', processedFile);
+                        const uploadResult = await axios.post('/api/upload', uploadFormData);
+
+                        if (uploadResult.data && uploadResult.data.success) {
+                            this.$message.success(`${actionLabel}完成并上传！`);
+                            await this.loadMediaFiles();
+                            setTimeout(() => {
+                                this.findAndPlayNewVideo(outName);
+                            }, 800);
+                            window.location.href = detailUrl;
+                        } else {
+                            this.$message.warning(`${actionLabel}完成，但上传到服务器失败`);
+                            window.location.href = detailUrl;
+                        }
+                    } else if (result.status === 'failed') {
+                        this.$message.error(`${actionLabel}失败: ` + (result.error || '未知错误'));
+                    } else {
+                        this.$message.warning(`${actionLabel}结束，但未生成结果视频`);
+                    }
+                } catch (error) {
+                    this.streamActive = false;
+                    if (error.response?.status === 404) {
+                        this.$message.error(`${actionLabel}失败: 实时接口404，请确认压线检测服务已重启并支持 /api/line_press/start 与 /api/line_press/stream`);
+                    } else {
+                        this.$message.error(`${actionLabel}失败: ` + (error.response?.data?.detail || error.message));
+                    }
+                } finally {
+                    this.violationLoading[loadingKey] = false;
+                }
+            },
+            async runIllegalParkingRealtime(loadingKey, actionLabel, baseUrlOverride) {
+                this.violationLoading[loadingKey] = true;
+                this.$message.info(`${actionLabel}处理中，已开启实时播放...`);
+
+                try {
+                    const violationType = 'illegal_parking';
+                    const apiBaseUrl = baseUrlOverride || this.pythonApiBaseUrl;
+
+                    const response = await fetch(this.currentVideo.url);
+                    const blob = await response.blob();
+                    const originalName = this.currentVideo.name || "video";
+                    const file = new File([blob], originalName, { type: blob.type || "video/*" });
+
+                    const formData = new FormData();
+                    formData.append('file', file);
+
+                    const startResp = await axios.post(`${apiBaseUrl}/api/illegal_parking/start`, formData);
+                    if (!startResp.data || !startResp.data.success) {
+                        throw new Error(startResp.data?.message || '启动实时检测失败');
+                    }
+
+                    const jobId = startResp.data.job_id;
+                    this.streamJobId = jobId;
+                    this.streamUrl = apiBaseUrl + startResp.data.stream_url;
+                    this.streamActive = true;
+
+                    const result = await this.pollIllegalParkingResult(apiBaseUrl, jobId);
+                    this.streamActive = false;
+
+                    if (result.status === 'done' && result.processed_url) {
+                        const processedRel = result.processed_url;
+                        const processedUrl = apiBaseUrl + processedRel;
+                        const detailUrl = `process_detail.html?job_id=${jobId}&type=${violationType}&video_url=${encodeURIComponent(processedUrl)}&filename=${encodeURIComponent(originalName)}`;
+
+                        const ext = (processedRel.split('.').pop() || '').toLowerCase();
+                        const mimeMap = {
+                            mp4: "video/mp4",
+                            avi: "video/x-msvideo",
+                            mov: "video/quicktime",
+                            mkv: "video/x-matroska"
+                        };
+
+                        const processedResponse = await fetch(processedUrl);
+                        const processedBlob = await processedResponse.blob();
+
+                        const outName = `${violationType}.mp4`;
+                        const outType = mimeMap[ext] || processedBlob.type || "video/mp4";
+
+                        if (ext && ext !== "mp4") {
+                            this.$message.warning(`处理后视频为 .${ext}，浏览器可能无法播放。建议让后端输出 MP4。`);
+                        }
+
+                        const processedFile = new File([processedBlob], outName, { type: outType });
+
+                        const uploadFormData = new FormData();
+                        uploadFormData.append('file', processedFile);
+                        const uploadResult = await axios.post('/api/upload', uploadFormData);
+
+                        if (uploadResult.data && uploadResult.data.success) {
+                            this.$message.success(`${actionLabel}完成并上传！`);
+                            await this.loadMediaFiles();
+                            setTimeout(() => {
+                                this.findAndPlayNewVideo(outName);
+                            }, 800);
+                            window.location.href = detailUrl;
+                        } else {
+                            this.$message.warning(`${actionLabel}完成，但上传到服务器失败`);
+                            window.location.href = detailUrl;
+                        }
+                    } else if (result.status === 'failed') {
+                        this.$message.error(`${actionLabel}失败: ` + (result.error || '未知错误'));
+                    } else {
+                        this.$message.warning(`${actionLabel}结束，但未生成结果视频`);
+                    }
+                } catch (error) {
+                    this.streamActive = false;
+                    if (error.response?.status === 404) {
+                        this.$message.error(`${actionLabel}失败: 实时接口404，请确认违停检测服务已重启并支持 /api/illegal_parking/start 与 /api/illegal_parking/stream`);
+                    } else {
+                        this.$message.error(`${actionLabel}失败: ` + (error.response?.data?.detail || error.message));
+                    }
+                } finally {
+                    this.violationLoading[loadingKey] = false;
+                }
+            },
+            handleStreamError() {
+                this.streamActive = false;
+                this.$message.error('实时流加载失败，请确认逆行检测服务已启动且可访问 /api/wrong_way/stream');
+            },
+            async pollWrongWayResult(apiBaseUrl, jobId) {
+                const maxAttempts = 180; // 约 6 分钟
+                for (let i = 0; i < maxAttempts; i++) {
+                    await new Promise(resolve => setTimeout(resolve, 2000));
+                    try {
+                        const res = await axios.get(`${apiBaseUrl}/api/wrong_way/result`, { params: { job_id: jobId } });
+                        if (res.data && res.data.status && res.data.status !== 'running' && res.data.status !== 'queued') {
+                            return res.data;
+                        }
+                    } catch (e) {
+                        // ignore and continue polling
+                    }
+                }
+                return { status: 'failed', error: '处理超时' };
+            },
+            async pollLinePressResult(apiBaseUrl, jobId) {
+                const maxAttempts = 180;
+                for (let i = 0; i < maxAttempts; i++) {
+                    await new Promise(resolve => setTimeout(resolve, 2000));
+                    try {
+                        const res = await axios.get(`${apiBaseUrl}/api/line_press/result`, { params: { job_id: jobId } });
+                        if (res.data && res.data.status && res.data.status !== 'running' && res.data.status !== 'queued') {
+                            return res.data;
+                        }
+                    } catch (e) {
+                        // ignore
+                    }
+                }
+                return { status: 'failed', error: '处理超时' };
+            },
+            async pollIllegalParkingResult(apiBaseUrl, jobId) {
+                const maxAttempts = 180;
+                for (let i = 0; i < maxAttempts; i++) {
+                    await new Promise(resolve => setTimeout(resolve, 2000));
+                    try {
+                        const res = await axios.get(`${apiBaseUrl}/api/illegal_parking/result`, { params: { job_id: jobId } });
+                        if (res.data && res.data.status && res.data.status !== 'running' && res.data.status !== 'queued') {
+                            return res.data;
+                        }
+                    } catch (e) {
+                        // ignore
+                    }
+                }
+                return { status: 'failed', error: '处理超时' };
+            },
+            // 刷新
+            async refreshFiles() {
+                this.refreshLoading = true;
+                try {
+                    const response = await axios.post('/api/refresh');
+                    if (response.data.success) {
+                        this.$message.success(response.data.message);
+                        await this.loadMediaFiles();
+                    } else {
+                        this.$message.error(response.data.message);
+                    }
+                } catch (error) {
+                    this.$message.error('刷新失败: ' + error.message);
+                } finally {
+                    this.refreshLoading = false;
+                }
+            },
+
+            // 上传成功处理
+            async handleUploadSuccess(response, file) {
+                if (response.success) {
+                    this.$message.success('上传成功');
+                    await this.loadMediaFiles();
+                } else {
+                    this.$message.error(response.message || '上传失败');
+                }
+            },
+
+            // 上传前处理
+            beforeUpload(file) {
+                const isMedia = file.type.startsWith('video/') || file.type.startsWith('image/');
+                const isLt100M = file.size / 1024 / 1024 < 100;
+
+                // 有些浏览器对 avi 的 type 可能为空，这里增加后缀兜底
+                const name = (file.name || '').toLowerCase();
+                const extOk = name.endsWith('.mp4') || name.endsWith('.avi') || name.endsWith('.mov') || name.endsWith('.mkv') ||
+                    name.endsWith('.jpg') || name.endsWith('.jpeg') || name.endsWith('.png');
+
+                if (!isMedia && !extOk) {
+                    this.$message.error('只能上传视频或图片文件!');
+                    return false;
+                }
+                if (!isLt100M) {
+                    this.$message.error('文件大小不能超过 100MB!');
+                    return false;
+                }
+                return true;
+            },
+
+            handleUploadError(err, file) {
+                this.$message.error('上传失败: ' + (err.message || '未知错误'));
+            },
+
+            // ? 文件节点点击处理（增加 AVI/不支持格式提示）
+            async handleNodeClick(data) {
+                if (data.url && data.id) {
+                    try {
+                        const accessible = await this.checkMediaAccessible(data.url);
+                        if (accessible === false) {
+                            this.$message.error('文件不存在，已刷新列表');
+                            await this.loadMediaFiles();
+                            return;
+                        }
+                    } catch (e) {
+                        console.warn('HEAD 检测失败，继续尝试播放:', e);
+                    }
+
+                    if (this.videoObjectUrl) {
+                        URL.revokeObjectURL(this.videoObjectUrl);
+                        this.videoObjectUrl = null;
+                    }
+
+                    this.currentVideo = {
+                        id: data.id,
+                        name: data.name || data.label,
+                        url: data.url,
+                        type: data.type
+                    };
+                    this.isPlaying = false;
+
+                    this.$nextTick(() => {
+                        if (this.currentVideo.type === 'video') {
+                            const video = this.$refs.videoPlayer;
+                            if (video) {
+                                const name = (this.currentVideo.name || '').toLowerCase();
+                                const ext = name.split('.').pop() || '';
+                                const canMp4 = !!video.canPlayType && video.canPlayType('video/mp4');
+
+                                if (ext === 'avi') {
+                                    this.$message.warning('当前视频为 AVI，浏览器大概率无法直接播放。建议转码为 MP4。');
+                                } else if (ext === 'mp4' && !canMp4) {
+                                    this.$message.warning('浏览器不支持当前 MP4 编码格式。');
+                                }
+
+                                video.src = this.addCacheBuster(this.currentVideo.url);
+                                video.load();
+                            }
+                        }
+                    });
+                }
+            },
+
+            // 播放控制
+            togglePlay() {
+                const video = this.$refs.videoPlayer;
+                if (video) {
+                    if (this.isPlaying) {
+                        video.pause();
+                    } else {
+                        video.play().catch(error => {
+                            this.$message.error('视频播放失败: ' + error.message);
+                        });
+                    }
+                    this.isPlaying = !this.isPlaying;
+                }
+            },
+
+            // 下载
+            async downloadFile() {
+                if (this.currentVideo.url && this.currentVideo.id) {
+                    try {
+                        const response = await axios.get(this.currentVideo.url, { responseType: 'blob' });
+
+                        const blob = new Blob([response.data]);
+                        const downloadUrl = window.URL.createObjectURL(blob);
+                        const link = document.createElement('a');
+                        link.href = downloadUrl;
+                        link.download = this.currentVideo.name || 'download';
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                        window.URL.revokeObjectURL(downloadUrl);
+
+                        this.$message.success('下载开始');
+                    } catch (error) {
+                        window.open(this.currentVideo.url, '_blank');
+                    }
+                } else {
+                    this.$message.warning('请先选择要下载的文件');
+                }
+            },
+
+            // 车流量统计
+            async trafficFlow() {
+                if (!this.currentVideo.url || this.currentVideo.type !== 'video') {
+                    this.$message.warning('请先选择一个视频文件');
+                    return;
+                }
+
+                const lineRatio = await this.$prompt('请输入计数线位置比例 (0-1)', '提示', {
+                    confirmButtonText: '确定',
+                    cancelButtonText: '取消',
+                    inputPattern: /^(0\.\d+|[01]?)$/,
+                    inputErrorMessage: '比例必须在0-1之间',
+                    inputValue: '0.5'
+                }).then(({ value }) => {
+                    return parseFloat(value) || 0.5;
+                }).catch(() => null);
+
+                if (lineRatio === null) return;
+
+                this.trafficFlowLoading = true;
+                this.$message.info('正在进行车流量统计，请稍候...');
+
+                try {
+                    const response = await fetch(this.currentVideo.url);
+                    if (!response.ok) {
+                        throw new Error(`下载视频失败: ${response.status} ${response.statusText}`);
+                    }
+
+                    const blob = await response.blob();
+                    const file = new File([blob], this.currentVideo.name || "video", { type: blob.type || "video/*" });
+
+                    const formData = new FormData();
+                    formData.append('file', file);
+                    formData.append('line_ratio', lineRatio.toString());
+
+                    const result = await axios.post(
+                        `${this.pythonApiBaseUrl}/api/traffic_flow`,
+                        formData,
+                        {
+                            timeout: 300000,
+                            headers: { 'Content-Type': 'multipart/form-data' }
+                        }
+                    );
+
+                    if (result.data.success && result.data.data) {
+                        const resultData = result.data.data;
+                        this.trafficFlowResult = resultData;
+
+                        let resultHtml = this.buildTrafficFlowResultHtml(resultData);
+
+                        this.$alert(resultHtml, '车流量统计完成', {
+                            dangerouslyUseHTMLString: true,
+                            confirmButtonText: '确定',
+                            customClass: 'traffic-flow-result',
+                            width: '700px',
+                            beforeClose: async (action, instance, done) => {
+                                if (action === 'confirm') {
+                                    if (result.data.processed_video_base64) {
+                                        await this.uploadProcessedVideo(
+                                            result.data.processed_video_base64,
+                                            result.data.processed_video_filename || 'processed_video.mp4'
+                                        );
+                                    }
+                                    done();
+                                } else {
+                                    done();
+                                }
+                            }
+                        });
+
+                        this.$message.success('车流量统计完成！');
+                    } else {
+                        const errorMsg = result.data.error || result.data.message || '未知错误';
+                        this.$message.error('车流量统计失败: ' + errorMsg);
+                    }
+                } catch (error) {
+                    console.error('车流量统计错误:', error);
+                    this.handleTrafficFlowError(error);
+                } finally {
+                    this.trafficFlowLoading = false;
+                }
+            },
+
+            // ? 保留更完整的错误处理（去掉重复定义）
+            handleTrafficFlowError(error) {
+                console.error('详细错误信息:', {
+                    message: error.message,
+                    code: error.code,
+                    response: error.response?.data,
+                    status: error.response?.status
+                });
+
+                if (error.code === 'ECONNABORTED') {
+                    this.$message.error('请求超时，视频处理时间较长，请稍后重试或使用更短的视频');
+                } else if (error.response) {
+                    if (error.response.status === 413) {
+                        this.$message.error('视频文件太大，请上传小于500MB的文件');
+                    } else if (error.response.status === 400) {
+                        this.$message.error('请求参数错误: ' + (error.response.data.error || ''));
+                    } else if (error.response.status === 500) {
+                        this.$message.error('服务器内部错误: ' + (error.response.data.error || ''));
+                    } else {
+                        this.$message.error('服务器错误: ' + error.response.status);
+                    }
+                } else if (error.message.includes('Failed to fetch')) {
+                    this.$message.error('无法连接到Python服务，请确保Python服务正在运行在 http://localhost:8000');
+                } else if (error.message.includes('Network Error')) {
+                    this.$message.error('网络错误，请检查网络连接');
+                } else {
+                    this.$message.error('车流量统计失败: ' + error.message);
+                }
+            },
+
+            // 上传处理后的视频（车流量统计用）
+            async uploadProcessedVideo(base64Data, filename) {
+                try {
+                    this.$message.info('正在上传处理后的视频...');
+
+                    const byteCharacters = atob(base64Data);
+                    const byteNumbers = new Array(byteCharacters.length);
+                    for (let i = 0; i < byteCharacters.length; i++) {
+                        byteNumbers[i] = byteCharacters.charCodeAt(i);
+                    }
+                    const byteArray = new Uint8Array(byteNumbers);
+
+                    // 根据扩展名给个更合理的 type
+                    const lower = (filename || '').toLowerCase();
+                    let mime = 'video/mp4';
+                    if (lower.endsWith('.avi')) mime = 'video/x-msvideo';
+                    if (lower.endsWith('.mov')) mime = 'video/quicktime';
+                    if (lower.endsWith('.mkv')) mime = 'video/x-matroska';
+
+                    const blob = new Blob([byteArray], { type: mime });
+                    const file = new File([blob], filename, { type: mime });
+
+                    const formData = new FormData();
+                    formData.append('file', file);
+
+                    const uploadResult = await axios.post('/api/upload', formData, {
+                        headers: { 'Content-Type': 'multipart/form-data' }
+                    });
+
+                    if (uploadResult.data.success) {
+                        this.$message.success('处理后的视频已保存到服务器');
+                        await this.loadMediaFiles();
+
+                        setTimeout(() => {
+                            this.findAndPlayNewVideo(filename);
+                        }, 1000);
+                    } else {
+                        this.$message.warning('视频处理完成，但保存到服务器失败: ' + uploadResult.data.message);
+                    }
+                } catch (error) {
+                    console.error('上传处理后的视频失败:', error);
+                    this.$message.warning('视频处理完成，但保存到服务器时出错: ' + error.message);
+                }
+            },
+
+            // 查找并播放新上传的视频
+            findAndPlayNewVideo(filename) {
+                for (const category of this.mediaTree) {
+                    if (category.children) {
+                        for (const file of category.children) {
+                            if (file.name === filename || (file.name && filename && file.name.includes(filename))) {
+                                this.handleNodeClick(file);
+                                this.$message.info('已自动切换到处理后的视频');
+                                return;
+                            }
+                        }
+                    }
+                }
+                console.warn('未找到新上传的视频:', filename);
+            },
+
+            buildTrafficFlowResultHtml(resultData) {
+                return `
+<div style="max-height: 500px; overflow-y: auto;">
+    <h3 style="color: #409EFF; margin-bottom: 15px;">车流量统计结果</h3>
+    <div style="background: #f8f9fa; padding: 15px; border-radius: 4px; margin-bottom: 15px;">
+        <p style="margin: 5px 0;"><strong>总车辆数:</strong> <span style="color: #F56C6C; font-size: 18px;">${resultData.total_vehicles}</span></p>
+        <p style="margin: 5px 0;"><strong>跟踪车辆数:</strong> ${resultData.tracking_count}</p>
+        <p style="margin: 5px 0;"><strong>处理帧数:</strong> ${resultData.processed_frames}</p>
+        <p style="margin: 5px 0;"><strong>平均车流量:</strong> ${resultData.average_traffic || 'N/A'}</p>
+    </div>
+
+    ${resultData.video_info ? `
+        <div style="margin-bottom: 15px;">
+            <h4>视频信息</h4>
+            <p style="margin: 3px 0; font-size: 12px; color: #666;">尺寸: ${resultData.video_info.width}×${resultData.video_info.height}</p>
+            <p style="margin: 3px 0; font-size: 12px; color: #666;">FPS: ${resultData.video_info.fps}</p>
+            <p style="margin: 3px 0; font-size: 12px; color: #666;">时长: ${resultData.video_info.duration}</p>
+        </div>
+    ` : ''}
+
+    ${resultData.processing_info ? `
+        <div style="margin-bottom: 15px;">
+            <h4>处理信息</h4>
+            <p style="margin: 3px 0; font-size: 12px; color: #666;">总耗时: ${resultData.processing_info.total_time}</p>
+            <p style="margin: 3px 0; font-size: 12px; color: #666;">处理速度: ${resultData.processing_info.processing_speed}</p>
+            <p style="margin: 3px 0; font-size: 12px; color: #666;">使用设备: ${resultData.processing_info.device}</p>
+        </div>
+    ` : ''}
+
+    <div style="margin-top: 20px; padding: 10px; background: #e8f4ff; border-radius: 4px;">
+        <p style="margin: 0; color: #409EFF;">
+            <i class="el-icon-loading"></i> 处理后的视频正在保存到服务器...
+        </p>
+    </div>
+</div>
+    `;
+            },
+
+            // 删除
+            async deleteFile() {
+                if (this.currentVideo.id) {
+                    try {
+                        await this.$confirm('确定删除这个文件吗?', '提示', {
+                            confirmButtonText: '确定',
+                            cancelButtonText: '取消',
+                            type: 'warning'
+                        });
+
+                        const response = await axios.delete(`/api/files/${this.currentVideo.id}`);
+                        if (response.data.success) {
+                            this.$message.success('删除成功');
+                            this.currentVideo = {};
+                            await this.loadMediaFiles();
+                        } else {
+                            this.$message.error(response.data.message || '删除失败');
+                        }
+                    } catch (error) {
+                        if (error !== 'cancel') {
+                            this.$message.error('删除失败: ' + error.message);
+                        }
+                    }
+                } else {
+                    this.$message.warning('请先选择要删除的文件');
+                }
+            },
+
+            // 加载媒体文件
+            async loadMediaFiles() {
+                try {
+                    const response = await axios.get('/api/files');
+
+                    if (response.data.success) {
+                        const files = response.data.data;
+
+                        files.sort((a, b) => {
+                            const timeA = new Date(b.lastModified || 0).getTime();
+                            const timeB = new Date(a.lastModified || 0).getTime();
+                            return timeA - timeB;
+                        });
+
+                        this.mediaTree = [
+                            {
+                                label: `视频文件 (${files.filter(f => f.type === 'video').length})`,
+                                children: files.filter(f => f.type === 'video').map(f => ({
+                                    id: f.id,
+                                    label: f.name,
+                                    url: f.url,
+                                    type: f.type,
+                                    name: f.name,
+                                    size: f.size,
+                                    lastModified: f.lastModified
+                                }))
+                            },
+                            {
+                                label: `图片文件 (${files.filter(f => f.type === 'image').length})`,
+                                children: files.filter(f => f.type === 'image').map(f => ({
+                                    id: f.id,
+                                    label: f.name,
+                                    url: f.url,
+                                    type: f.type,
+                                    name: f.name,
+                                    size: f.size,
+                                    lastModified: f.lastModified
+                                }))
+                            }
+                        ];
+                    } else {
+                        this.$message.error('获取文件列表失败: ' + (response.data.message || '未知错误'));
+                        this.mediaTree = this.getDefaultMediaTree();
+                    }
+
+                } catch (error) {
+                    console.error('加载文件列表失败:', error);
+                    this.$message.error('加载文件列表失败: ' + error.message);
+                    this.mediaTree = this.getDefaultMediaTree();
+                }
+            },
+
+            getDefaultMediaTree() {
+                return [
+                    { label: '视频文件 (0)', children: [] },
+                    { label: '图片文件 (0)', children: [] }
+                ];
+            },
+
+            onVideoLoad() {
+                this.videoRetrying = false;
+                console.log('视频加载成功');
+            },
+
+            async onVideoError(event) {
+                const video = event.target;
+                const error = video.error;
+
+                let errorMessage = '视频加载失败: ';
+
+                if (error) {
+                    switch(error.code) {
+                        case error.MEDIA_ERR_ABORTED:
+                            errorMessage += '视频加载被中止';
+                            break;
+                        case error.MEDIA_ERR_NETWORK:
+                            errorMessage += '网络错误，视频加载失败';
+                            break;
+                        case error.MEDIA_ERR_DECODE:
+                            errorMessage += '视频解码错误，编码格式可能不支持';
+                            break;
+                        case error.MEDIA_ERR_SRC_NOT_SUPPORTED:
+                            errorMessage += '视频格式不支持或文件损坏';
+                            break;
+                        default:
+                            errorMessage += '未知错误';
+                    }
+                } else {
+                    errorMessage += '未知错误';
+                }
+
+                console.error('视频错误详情:', {
+                    errorCode: error ? error.code : '无错误代码',
+                    errorMessage: errorMessage,
+                    videoSrc: video.src,
+                    videoNetworkState: video.networkState,
+                    videoReadyState: video.readyState
+                });
+
+                if (!this.videoRetrying && video.src) {
+                    this.videoRetrying = true;
+                    try {
+                        const refreshed = this.addCacheBuster(video.src);
+                        const res = await fetch(refreshed, { method: 'GET' });
+                        if (res.ok) {
+                            const blob = await res.blob();
+                            if (this.videoObjectUrl) {
+                                URL.revokeObjectURL(this.videoObjectUrl);
+                            }
+                            this.videoObjectUrl = URL.createObjectURL(blob);
+                            video.src = this.videoObjectUrl;
+                            video.load();
+                            return;
+                        }
+                        if (res.status === 404) {
+                            this.$message.error('视频文件不存在，已尝试刷新列表');
+                            await this.loadMediaFiles();
+                            return;
+                        }
+                    } catch (e) {
+                        console.warn('视频重试失败:', e);
+                    }
+                }
+
+                this.$message.error(errorMessage + '，建议转码为 H.264/AAC 的 MP4。');
+            },
+
+            addCacheBuster(url) {
+                const hasQuery = url.includes('?');
+                return url + (hasQuery ? '&' : '?') + 't=' + Date.now();
+            },
+
+            async checkMediaAccessible(url) {
+                const testUrl = this.addCacheBuster(url);
+                try {
+                    const head = await fetch(testUrl, { method: 'HEAD' });
+                    if (head.ok) {
+                        return true;
+                    }
+                    if (head.status === 404 || head.status === 405 || head.status === 403) {
+                        const rangeRes = await fetch(testUrl, {
+                            method: 'GET',
+                            headers: { Range: 'bytes=0-1' }
+                        });
+                        if (rangeRes.ok || rangeRes.status === 206) {
+                            return true;
+                        }
+                        if (rangeRes.status === 404) {
+                            return false;
+                        }
+                    }
+                    return true;
+                } catch (e) {
+                    try {
+                        const rangeRes = await fetch(testUrl, {
+                            method: 'GET',
+                            headers: { Range: 'bytes=0-1' }
+                        });
+                        return rangeRes.ok || rangeRes.status === 206;
+                    } catch (err) {
+                        return true;
+                    }
+                }
+            }
+        }
+    });
+</script>
+</html>
+
+

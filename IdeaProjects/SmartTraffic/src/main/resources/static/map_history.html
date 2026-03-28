@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>车辆历史轨迹回放</title>
+    <!-- Element UI CSS (Vue 2版本) -->
+    <link rel="stylesheet" href="css/lib/index.min.css">
+    <link rel="stylesheet" href="css/map_history.css">
+
+</head>
+<body>
+<div id="history-app">
+    <!-- 控制面板 -->
+    <div class="control-panel">
+        <div class="control-row">
+            <div class="control-group">
+                <label>选择车辆：</label>
+                <el-select
+                        v-model="selectedDevice"
+                        placeholder="请选择车辆"
+                        size="small"
+                        style="width: 150px"
+                        @change="onDeviceChange">
+                    <el-option
+                            v-for="device in deviceList"
+                            :key="device.sn"
+                            :label="device.tname"
+                            :value="device.sn">
+                    </el-option>
+                </el-select>
+            </div>
+            <div class="info-item">
+                <span class="info-label">设备SN：</span>
+                <span class="info-value">{{ vehicleInfo.sn }}</span>
+            </div>
+            <div class="control-group">
+                <label>选择日期：</label>
+                <el-date-picker
+                        v-model="selectedDate"
+                        type="date"
+                        placeholder="选择回放日期"
+                        size="small"
+                        style="width: 150px"
+                        format="yyyy-MM-dd"
+                        value-format="yyyy-MM-dd"
+                        @change="onDateChange">
+                </el-date-picker>
+            </div>
+            <div class="control-group">
+                <label>播放速度：</label>
+                <el-select
+                        v-model="playSpeedType"
+                        placeholder="选择速度"
+                        size="small"
+                        style="width: 100px"
+                        @change="onSpeedChange">
+                    <el-option label="慢速" value="slow"></el-option>
+                    <el-option label="中速" value="medium"></el-option>
+                    <el-option label="快速" value="fast"></el-option>
+                </el-select>
+            </div>
+            <div class="control-group">
+                <el-checkbox v-model="autoTrack" size="small">地图跟踪</el-checkbox>
+            </div>
+            <div class="info-item">
+                <span class="info-label">当前状态：</span>
+                <span :style="{color: statusColor}" class="info-value">{{ statusText }}</span>
+            </div>
+        </div>
+
+        <div class="control-buttons">
+            <el-button type="primary" size="small" @click="startPlayback" :loading="loading">
+                <i class="el-icon-video-play"></i> 开始回放
+            </el-button>
+            <el-button type="warning" size="small" @click="stopPlayback" :disabled="!isPlaying">
+                <i class="el-icon-video-pause"></i> 暂停
+            </el-button>
+            <el-button type="info" size="small" @click="resetPlayback" :disabled="!hasData">
+                <i class="el-icon-refresh"></i> 重置
+            </el-button>
+            <el-button size="small" @click="todayPlayback">
+                <i class="el-icon-date"></i> 今日回放
+            </el-button>
+        </div>
+    </div>
+
+    <!-- 地图容器 -->
+    <div class="map-container">
+        <div id="map"></div>
+
+        <!-- 加载遮罩 -->
+        <div class="loading-overlay" v-if="loading">
+            <i class="el-icon-loading" style="font-size: 36px; color: #409EFF;"></i>
+            <div class="loading-text">正在加载轨迹数据...</div>
+        </div>
+    </div>
+
+    <!-- 状态栏 -->
+    <div class="status-bar">
+        <div class="playback-info">
+            <div>
+                <span>回放进度：</span>
+                <span v-if="hasData">
+                        {{ currentIndex }} / {{ trackPoints.length }} 个轨迹点
+                    </span>
+                <span v-else>暂无数据</span>
+            </div>
+            <div class="time-display" v-if="currentTime">
+                {{ currentTime }}
+            </div>
+            <div v-if="selectedDate">
+                回放日期：{{ selectedDate }}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 引入依赖 -->
+<script src="js/lib/vue.min.js"></script>
+<script src="js/lib/index.min.js"></script> <!-- 确保这是Element UI for Vue 2 -->
+<script src="js/lib/axios.min.js"></script>
+<script src="js/lib/moment.min.js"></script>
+<script type="text/javascript" src="http://api.map.baidu.com/api?v=2.0&ak=PI3VfWo5wYHDlj0fziHeQiKL4jMT1DEw"></script>
+
+<script>
+    // Vue 2 版本 - 使用全局 Vue 对象
+    new Vue({
+        el: '#history-app',
+        data: function() {
+            return {
+                // 车辆信息
+                vehicleInfo: {
+                    sn: '',
+                    name: '未知车辆'
+                },
+
+                // 设备列表
+                deviceList: [],
+                selectedDevice: '',
+
+                // 日期选择（只能选择单日）
+                selectedDate: null,
+
+                // 播放控制
+                autoTrack: true,
+                playSpeedType: 'medium', // 添加：速度类型（slow/medium/fast）
+                playSpeed: 100,          // 当前实际速度
+                isPlaying: false,
+                loading: false,
+                hasData: false,
+
+                // 轨迹数据
+                trackPoints: [],
+                currentIndex: 0,
+                playTimer: null,
+
+                // 百度地图实例
+                map: null,
+                polyline: null,
+                marker: null,
+
+                // 状态
+                statusText: '等待开始',
+                statusColor: '#909399',
+
+                // 当前时间显示
+                currentTime: ''
+            };
+        },
+
+        mounted() {
+            this.initMap();
+            this.initFromUrl();
+            this.loadDeviceList();
+            this.setDefaultDate();
+            this.setDefaultSpeed();
+        },
+
+        beforeDestroy() {
+            // 清理定时器
+            clearTimeout(this.playTimer);
+        },
+
+        methods: {
+            // 初始化地图
+            initMap() {
+                this.map = new BMap.Map("map");
+                // 设置默认中心点（北京）
+                const chinaCenter = new BMap.Point(104.06, 35.86);
+                // 设置缩放级别为5，这个级别能显示中国全图
+                this.map.centerAndZoom(chinaCenter, 5);
+                this.map.enableScrollWheelZoom(true);
+
+                // 添加控件
+                this.map.addControl(new BMap.NavigationControl());
+                this.map.addControl(new BMap.ScaleControl());
+                this.map.addControl(new BMap.OverviewMapControl());
+
+                // 初始化覆盖物
+                this.initOverlays();
+            },
+
+            // 初始化覆盖物
+            initOverlays() {
+                // 清除已有的折线
+                if (this.polyline) {
+                    this.map.removeOverlay(this.polyline);
+                }
+
+                // 清除已有的标记
+                if (this.marker) {
+                    this.map.removeOverlay(this.marker);
+                }
+
+                // 创建新的折线
+                this.polyline = new BMap.Polyline([], {
+                    strokeColor: "#409EFF",
+                    strokeWeight: 3,
+                    strokeOpacity: 0.8
+                });
+                this.map.addOverlay(this.polyline);
+
+                // 创建初始标记（使用默认南方向）
+                this.marker = new BMap.Marker(new BMap.Point(0, 0));
+                this.map.addOverlay(this.marker);
+            },
+
+            // 从URL获取参数
+            initFromUrl() {
+                const params = this.getUrlParams();
+                if (params.sn) {
+                    this.vehicleInfo.sn = params.sn;
+                    this.selectedDevice = params.sn;
+                }
+                if (params.tname) {
+                    this.vehicleInfo.name = params.tname;
+                }
+            },
+
+            // 解析URL参数
+            getUrlParams() {
+                const params = {};
+                const queryString = window.location.search.substring(1);
+                const pairs = queryString.split('&');
+
+                pairs.forEach(pair => {
+                    const [key, value] = pair.split('=');
+                    if (key) {
+                        params[key] = decodeURIComponent(value || '');
+                    }
+                });
+
+                return params;
+            },
+
+            // 速度类型改变处理
+            onSpeedChange(speedType) {
+                // 定义不同速度对应的毫秒值
+                const speedMap = {
+                    'slow': 200,   // 慢速：0.2秒
+                    'medium': 100,  // 中速：0.1秒
+                    'fast': 50     // 快速：0.05秒
+                };
+
+                this.playSpeed = speedMap[speedType] || 500;
+                console.log(`播放速度已更改为: ${speedType} (${this.playSpeed}ms)`);
+
+                // 如果正在播放，立即更新定时器
+                if (this.isPlaying) {
+                    clearTimeout(this.playTimer);
+                    this.playNextPoint();
+                }
+            },
+
+            // 初始化时设置默认速度
+            setDefaultSpeed() {
+                this.onSpeedChange(this.playSpeedType);
+            },
+
+            // 设置默认日期（今天）
+            setDefaultDate() {
+                const today = new Date();
+                this.selectedDate = this.formatDate(today);
+            },
+
+            // 格式化日期为 YYYY-MM-DD
+            formatDate(date) {
+                const year = date.getFullYear();
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const day = String(date.getDate()).padStart(2, '0');
+                return `${year}-${month}-${day}`;
+            },
+
+            // 加载设备列表
+            loadDeviceList() {
+                axios.get('/api/map-history/devices')
+                    .then(response => {
+                        if (response.data.success) {
+                            this.deviceList = response.data.data;
+                            console.log('设备列表加载成功:', this.deviceList);
+
+                            if (!this.selectedDevice && this.deviceList.length > 0) {
+                                this.selectedDevice = this.deviceList[0].sn;
+                                this.updateVehicleInfo();
+                            }
+                        } else {
+                            console.error('获取设备列表失败:', response.data.message);
+                            this.$message.error('获取设备列表失败');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('请求失败:', error);
+                        this.$message.error('网络请求失败');
+                    });
+            },
+
+            // 设备变更处理
+            onDeviceChange(sn) {
+                const device = this.deviceList.find(d => d.sn === sn);
+                if (device) {
+                    this.vehicleInfo.sn = device.sn;
+                    this.vehicleInfo.name = device.name;
+                }
+            },
+
+            // 日期变更处理
+            onDateChange(date) {
+                if (date) {
+                    console.log('选择日期:', date);
+                }
+            },
+
+            // 更新车辆信息
+            updateVehicleInfo() {
+                const device = this.deviceList.find(d => d.sn === this.selectedDevice);
+                if (device) {
+                    this.vehicleInfo.sn = device.sn;
+                    this.vehicleInfo.name = device.name;
+                }
+            },
+
+            // 开始回放
+            startPlayback() {
+                if (!this.selectedDevice) {
+                    this.$message.warning('请选择设备');
+                    return;
+                }
+
+                if (!this.selectedDate) {
+                    this.$message.warning('请选择回放日期');
+                    return;
+                }
+
+                this.loading = true;
+                this.statusText = '正在加载轨迹数据...';
+                this.statusColor = '#409EFF';
+
+                // 调用API获取历史轨迹数据
+                this.fetchHistoryData().then(data => {
+                    this.trackPoints = data;
+
+                    if (this.trackPoints.length === 0) {
+                        this.$message.warning('该日期内没有轨迹数据');
+                        this.loading = false;
+                        this.statusText = '无轨迹数据';
+                        this.statusColor = '#E6A23C';
+                        return;
+                    }
+
+                    this.hasData = true;
+                    this.currentIndex = 0;
+
+                    // 绘制轨迹
+                    this.drawTrack();
+
+                    console.log(`设置了 ${this.playSpeed}ms 后触发下一个点`);
+
+                    // 开始播放
+                    this.startPlaying();
+
+                }).catch(error => {
+                    console.error('播放轨迹数据失败:', error);
+                    this.$message.error('播放轨迹数据失败');
+                    this.statusText = '加载失败';
+                    this.statusColor = '#F56C6C';
+                }).finally(() => {
+                    this.loading = false;
+                });
+            },
+
+            // 获取历史轨迹数据
+            async fetchHistoryData() {
+                // 这里应该是调用后端API，根据设备SN和日期获取数据
+                return new Promise(resolve => {
+                    // 调用新的API
+                    axios.get('/api/map-history/track/day', {
+                        params: {
+                            sn: this.selectedDevice,
+                            date: this.selectedDate
+                        }
+                    })
+                        .then(response => {
+                            if (response.data.success) {
+                                const data = response.data.data;
+                                // 转换为前端需要的格式
+                                const points = data.map(point => ({
+                                    lng: point.lng,
+                                    lat: point.lat,
+                                    time: new Date(point.time),
+                                    speed: point.speed,
+                                    direction: point.direction
+                                }));
+                                resolve(points);
+                            } else {
+                                console.error('获取轨迹数据失败:', response.data.message);
+                                resolve([]);
+                            }
+                        })
+                        .catch(error => {
+                            console.error('API调用失败:', error);
+                            resolve([]);
+                        });
+                });
+            },
+
+            // 绘制轨迹
+            drawTrack() {
+
+                if (!this.trackPoints || this.trackPoints.length === 0) {
+                    console.error('drawTrack: 没有轨迹点可以绘制');
+                    this.$message.warning('没有轨迹数据可绘制');
+                    return;
+                }
+
+                // 检查百度地图是否初始化
+                if (!this.map) {
+                    console.error('drawTrack: 百度地图未初始化');
+                    this.$message.error('地图未初始化');
+                    return;
+                }
+
+                try {
+                    // 清除之前的覆盖物
+                    this.initOverlays();
+
+                    // 获取所有点的坐标
+                    const points = this.trackPoints.map(point => {
+                        return new BMap.Point(point.lng, point.lat);
+                    });
+
+                    console.log('百度地图坐标点:', points);
+
+                    // 检查是否有有效的点
+                    if (points.length === 0 || !points[0] || points[0].lng === undefined) {
+                        console.error('坐标点无效');
+                        this.$message.error('轨迹坐标数据无效');
+                        return;
+                    }
+
+                    // 更新折线
+                    this.polyline.setPath(points);
+                    console.log('折线绘制完成');
+
+                    // 设置地图视野
+                    if (points.length > 0) {
+                        console.log('设置地图视野');
+                        this.map.setViewport(points);
+                    } else {
+                        console.warn('没有坐标点，无法设置视野');
+                    }
+
+                } catch (error) {
+                    console.error('drawTrack 出错:', error);
+                    this.$message.error('绘制轨迹失败: ' + error.message);
+                }
+            },
+
+            // 开始播放
+            startPlaying() {
+                if (this.trackPoints.length === 0) {
+                    console.error('startPlaying: 没有轨迹点');
+                    this.$message.error('没有轨迹数据');
+                    this.isPlaying = false;
+                    return;
+                }
+
+                this.isPlaying = true;
+                this.statusText = '正在回放中...';
+                this.statusColor = '#67C23A';
+                console.log('状态已更新');
+
+                this.playNextPoint();
+            },
+
+            // 播放下一个点
+            playNextPoint() {
+                // 检查停止条件
+                if (this.currentIndex >= this.trackPoints.length) {
+                    console.log('已达到轨迹点末尾');
+                    this.stopPlayback();
+                    this.$message.success('回放完成');
+                    return;
+                }
+
+                if (!this.isPlaying) {
+                    console.log('播放已停止');
+                    return;
+                }
+
+                const point = this.trackPoints[this.currentIndex];
+
+                if (!point) {
+                    console.error(`第${this.currentIndex}个点不存在`);
+                    this.currentIndex++;
+                    this.playNextPoint(); // 跳过这个点，继续下一个
+                    return;
+                }
+
+                // 更新标记
+                try {
+                    this.updateMarker(point);
+                } catch (error) {
+                    console.error('updateMarker 出错:', error);
+                }
+
+                // 更新时间显示
+                this.currentTime = this.formatTime(point.time);
+
+                // 增加索引
+                const oldIndex = this.currentIndex;
+                this.currentIndex++;
+
+                // 设置下一个点的定时器
+                clearTimeout(this.playTimer);
+                this.playTimer = setTimeout(() => {
+                    this.playNextPoint();
+                }, this.playSpeed);
+            },
+
+            // 更新标记点
+            updateMarker(point) {
+                if (!point || !point.lng || !point.lat) {
+                    return;
+                }
+
+                const position = new BMap.Point(point.lng, point.lat);
+
+                // 设置标记位置
+                this.marker.setPosition(position);
+
+                // 根据方向更新图标
+                if (point.direction) {
+                    const iconMap = {
+                        '正北': 'arrow_n',
+                        '正南': 'arrow_s',
+                        '正西': 'arrow_w',
+                        '正东': 'arrow_e',
+                        '西北': 'arrow_wn',
+                        '西南': 'arrow_ws',
+                        '东北': 'arrow_en',
+                        '东南': 'arrow_es'
+                    };
+
+                    const iconName = iconMap[point.direction];
+                    if (iconName) {
+                        const iconUrl = `image/map/${iconName}.png`;
+                        const icon = new BMap.Icon(iconUrl, new BMap.Size(32, 32));
+                        this.marker.setIcon(icon);
+                    }
+                }
+
+                // 如果启用地图跟踪，移动地图中心
+                if (this.autoTrack) {
+                    this.map.panTo(position);
+                }
+            },
+
+            // 暂停播放
+            stopPlayback() {
+                this.isPlaying = false;
+                clearTimeout(this.playTimer);
+                this.statusText = '已暂停';
+                this.statusColor = '#E6A23C';
+            },
+
+            // 重置回放
+            resetPlayback() {
+                this.stopPlayback();
+                this.currentIndex = 0;
+                this.currentTime = '';
+                this.statusText = '等待开始';
+                this.statusColor = '#909399';
+
+                // 重置标记位置
+                if (this.trackPoints.length > 0) {
+                    const firstPoint = this.trackPoints[0];
+                    this.updateMarker(firstPoint);
+                }
+            },
+
+            // 今日回放
+            todayPlayback() {
+                const today = new Date();
+                this.selectedDate = this.formatDate(today);
+
+                this.$confirm(`是否回放今天（${this.selectedDate}）的轨迹？`, '今日回放', {
+                    confirmButtonText: '确定',
+                    cancelButtonText: '取消',
+                    type: 'info'
+                }).then(() => {
+                    this.startPlayback();
+                }).catch(() => {
+                    // 用户取消
+                });
+            },
+
+            // 格式化时间显示
+            formatTime(date) {
+                const hours = String(date.getHours()).padStart(2, '0');
+                const minutes = String(date.getMinutes()).padStart(2, '0');
+                const seconds = String(date.getSeconds()).padStart(2, '0');
+                return `${hours}:${minutes}:${seconds}`;
+            }
+        }
+    });
+</script>
+</body>
+</html>

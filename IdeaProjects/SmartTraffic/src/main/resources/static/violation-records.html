@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>违章记录 - 智慧交通管理系统</title>
+    <link rel="stylesheet" href="css/lib/index.min.css">
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            background: #f5f6fa;
+            font-family: "Microsoft YaHei", sans-serif;
+        }
+        .filter-card {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .table-card {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+        }
+        .operate-bar {
+            margin-bottom: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .status-tag {
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+        .status-untreated {
+            background: #fef2f2;
+            color: #f56c6c;
+        }
+        .status-processed {
+            background: #f0f9ff;
+            color: #1989fa;
+        }
+        .status-appealing {
+            background: #fff7e6;
+            color: #e6a23c;
+        }
+        .violation-type {
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            background: #f5f5f5;
+            color: #666;
+        }
+        .detail-modal .el-dialog-body {
+            padding: 20px;
+        }
+        .violation-photo {
+            width: 100%;
+            height: 200px;
+            background: #f5f5f5;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 20px;
+            overflow: hidden;
+        }
+        .violation-photo img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        .violation-info-item {
+            margin-bottom: 15px;
+            display: flex;
+            align-items: flex-start;
+        }
+        .violation-info-label {
+            width: 120px;
+            color: #666;
+            font-weight: 500;
+            margin-top: 4px;
+        }
+        .violation-info-value {
+            flex: 1;
+            color: #333;
+        }
+        .el-table {
+            --el-table-header-text-color: #333;
+            --el-table-row-hover-bg-color: #f8f9fa;
+        }
+    </style>
+</head>
+<body>
+<div id="app">
+    <!-- 筛选区 -->
+    <div class="filter-card">
+        <el-form :inline="true" :model="filterForm" class="demo-form-inline">
+            <el-form-item label="时间范围">
+                <el-date-picker
+                        v-model="filterForm.timeRange"
+                        type="daterange"
+                        range-separator="至"
+                        start-placeholder="开始日期"
+                        end-placeholder="结束日期"
+                        clearable>
+                </el-date-picker>
+            </el-form-item>
+            <el-form-item label="违章类型">
+                <el-select v-model="filterForm.violationType" placeholder="请选择违章类型" clearable>
+                    <el-option label="闯红灯" value="red_light"></el-option>
+                    <el-option label="逆行" value="wrong_way"></el-option>
+                    <el-option label="压线" value="line_press"></el-option>
+                    <el-option label="违停" value="illegal_parking"></el-option>
+                    <el-option label="未戴头盔" value="helmet"></el-option>
+                </el-select>
+            </el-form-item>
+            <el-form-item label="车牌号码">
+                <el-input v-model="filterForm.licensePlate" placeholder="请输入车牌号码" clearable></el-input>
+            </el-form-item>
+            <el-form-item>
+                <el-button type="primary" @click="searchViolations">搜索</el-button>
+                <el-button @click="resetFilter">重置</el-button>
+            </el-form-item>
+        </el-form>
+    </div>
+
+    <!-- 表格操作区 + 表格区 -->
+    <div class="table-card">
+        <div class="operate-bar">
+            <div>共 <span style="color: #1989fa; font-weight: bold;">{{ total }}</span> 条违章记录</div>
+            <div>
+                <el-button type="primary" size="small" @click="openStats">统计</el-button>
+                <el-button type="success" size="small" @click="exportViolations">导出CSV</el-button>
+                <el-button type="danger" size="small" @click="deleteSelectedViolations">批量删除</el-button>
+            </div>
+        </div>
+
+        <el-table :data="violationList" border style="width: 100%" v-loading="loading" @selection-change="handleSelectionChange">
+            <el-table-column type="selection" width="55"></el-table-column>
+            <el-table-column prop="licensePlate" label="车牌号码" width="120"></el-table-column>
+            <el-table-column prop="violationTime" label="违章时间" width="180"></el-table-column>
+            <el-table-column prop="violationAddr" label="违章地点"></el-table-column>
+            <el-table-column prop="violationType" label="违章类型" width="100">
+                <template slot-scope="scope">
+                        <span class="violation-type">
+                            {{ getViolationTypeText(scope.row.violationType) }}
+                        </span>
+                </template>
+            </el-table-column>
+            <el-table-column prop="punishResult" label="处罚结果" width="150"></el-table-column>
+            <el-table-column label="操作" width="180">
+                <template slot-scope="scope">
+                    <el-button type="text" @click="viewViolationDetail(scope.row)">查看详情</el-button>
+                </template>
+            </el-table-column>
+        </el-table>
+
+        <!-- 分页控件 -->
+        <el-pagination
+                @size-change="handleSizeChange"
+                @current-change="handleCurrentChange"
+                :current-page="currentPage"
+                :page-sizes="[10, 20, 50, 100]"
+                :page-size="pageSize"
+                layout="total, sizes, prev, pager, next, jumper"
+                :total="total"
+                style="margin-top: 20px; text-align: right;">
+        </el-pagination>
+    </div>
+
+    <!-- 违章详情弹窗 -->
+    <el-dialog title="违章详情" :visible.sync="detailVisible" width="700px" class="detail-modal">
+        <div v-if="currentViolation">
+            <div class="violation-photo">
+                <img v-if="currentViolation.imagePath" :src="'/uploads/image/' + currentViolation.imagePath" alt="违章现场照片">
+                <div v-else>暂无图片</div>
+            </div>
+            <div class="violation-info-item">
+                <div class="violation-info-label">车牌号码：</div>
+                <div class="violation-info-value">{{ currentViolation.licensePlate }}</div>
+            </div>
+            <div class="violation-info-item">
+                <div class="violation-info-label">违章时间：</div>
+                <div class="violation-info-value">{{ currentViolation.violationTime }}</div>
+            </div>
+            <div class="violation-info-item">
+                <div class="violation-info-label">违章地点：</div>
+                <div class="violation-info-value">{{ currentViolation.violationAddr || '-' }}</div>
+            </div>
+            <div class="violation-info-item">
+                <div class="violation-info-label">违章类型：</div>
+                <div class="violation-info-value">{{ getViolationTypeText(currentViolation.violationType) }}</div>
+            </div>
+            <div class="violation-info-item">
+                <div class="violation-info-label">违章详情：</div>
+                <div class="violation-info-value">{{ currentViolation.violationDesc }}</div>
+            </div>
+            <div class="violation-info-item">
+                <div class="violation-info-label">处罚结果：</div>
+                <div class="violation-info-value">{{ currentViolation.punishResult }}</div>
+            </div>
+            <div class="violation-info-item">
+                <div class="violation-info-label">置信度：</div>
+                <div class="violation-info-value">{{ currentViolation.confidence == null ? '-' : currentViolation.confidence.toFixed(2) + '%' }}</div>
+            </div>
+        </div>
+    </el-dialog>
+
+    <!-- 统计弹窗 -->
+    <el-dialog title="违章统计" :visible.sync="statsVisible" width="700px" @opened="renderStatsChart">
+        <div id="violationStatsChart" style="height: 340px;"></div>
+    </el-dialog>
+</div>
+
+<script src="js/lib/echarts.min.js"></script>
+<script src="js/lib/vue.min.js"></script>
+<script src="js/lib/index.min.js"></script>
+<script>
+    new Vue({
+        el: '#app',
+        data() {
+            return {
+                filterForm: {
+                    timeRange: [],
+                    violationType: '',
+                    licensePlate: ''
+                },
+                violationList: [],
+                loading: false,
+                currentPage: 1,
+                pageSize: 10,
+                total: 0,
+                stats: { total: 0, byType: [] },
+                selectedViolations: [], // 选中的违章记录
+                statsVisible: false,
+                statsChart: null,
+                // 详情弹窗
+                detailVisible: false,
+                currentViolation: null
+            }
+        },
+        mounted() {
+            // 页面加载时获取违章记录
+            this.getViolationList();
+        },
+        methods: {
+            // 获取违章记录列表
+            getViolationList() {
+                this.loading = true;
+                const timeRange = this.filterForm.timeRange || [];
+                const startTime = timeRange.length === 2 && timeRange[0] ? this.formatDateTime(timeRange[0]) : '';
+                const endTime = timeRange.length === 2 && timeRange[1] ? this.formatDateTime(timeRange[1]) : '';
+                const params = new URLSearchParams({
+                    plateNumber: this.filterForm.licensePlate || '',
+                    illegalType: this.filterForm.violationType || '',
+                    startTime: startTime,
+                    endTime: endTime,
+                    page: this.currentPage,
+                    pageSize: this.pageSize
+                });
+                fetch(`/api/violations?${params.toString()}`)
+                    .then(res => res.json())
+                    .then(res => {
+                        if (res.success && res.data) {
+                            this.violationList = Array.isArray(res.data.list) ? res.data.list : [];
+                            this.total = res.data.total || 0;
+                            this.selectedViolations = [];
+                            if (this.statsVisible) {
+                                this.getStats();
+                            }
+                        } else {
+                            this.$message.error(res.message || '获取违章记录失败');
+                        }
+                    })
+                    .catch(() => this.$message.error('获取违章记录异常'))
+                    .finally(() => { this.loading = false; });
+            },
+            // 搜索违章记录
+            searchViolations() {
+                this.currentPage = 1;
+                this.getViolationList();
+            },
+            // 重置筛选条件
+            resetFilter() {
+                this.filterForm = {
+                    timeRange: [],
+                    violationType: '',
+                    licensePlate: ''
+                };
+                this.getViolationList();
+            },
+            // 分页相关
+            handleSizeChange(val) {
+                this.pageSize = val;
+                this.getViolationList();
+            },
+            handleCurrentChange(val) {
+                this.currentPage = val;
+                this.getViolationList();
+            },
+            // 表格选择事件
+            handleSelectionChange(val) {
+                this.selectedViolations = val;
+            },
+            // 查看违章详情
+            viewViolationDetail(violation) {
+                this.currentViolation = violation;
+                this.detailVisible = true;
+            },
+            // 批量删除违章记录
+            deleteSelectedViolations() {
+                if (!this.selectedViolations || this.selectedViolations.length === 0) {
+                    this.$message.warning('请选择要删除的违章记录');
+                    return;
+                }
+                const ids = this.selectedViolations.map(item => item.id);
+                this.$confirm(`确定删除选中的 ${ids.length} 条违章记录吗？`, '提示', { type: 'warning' })
+                    .then(() => {
+                        fetch('/api/violations/clear-batch', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ ids })
+                        })
+                            .then(res => res.json())
+                            .then(res => {
+                                if (res.success) {
+                                    this.$message.success('批量删除成功');
+                                    this.getViolationList();
+                                } else {
+                                    this.$message.error(res.message || '批量删除失败');
+                                }
+                            })
+                            .catch(() => this.$message.error('批量删除异常'));
+                    })
+                    .catch(() => {});
+            },
+            exportViolations() {
+                const timeRange = this.filterForm.timeRange || [];
+                const startTime = timeRange.length === 2 && timeRange[0] ? this.formatDateTime(timeRange[0]) : '';
+                const endTime = timeRange.length === 2 && timeRange[1] ? this.formatDateTime(timeRange[1]) : '';
+                const params = new URLSearchParams({
+                    plateNumber: this.filterForm.licensePlate || '',
+                    illegalType: this.filterForm.violationType || '',
+                    startTime: startTime,
+                    endTime: endTime
+                });
+                const url = `/api/violations/export/csv?${params.toString()}`;
+                window.open(url, '_blank');
+            },
+            getStats() {
+                const timeRange = this.filterForm.timeRange || [];
+                const startTime = timeRange.length === 2 && timeRange[0] ? this.formatDateTime(timeRange[0]) : '';
+                const endTime = timeRange.length === 2 && timeRange[1] ? this.formatDateTime(timeRange[1]) : '';
+                const params = new URLSearchParams({
+                    plateNumber: this.filterForm.licensePlate || '',
+                    illegalType: this.filterForm.violationType || '',
+                    startTime: startTime,
+                    endTime: endTime
+                });
+                fetch(`/api/violations/stats?${params.toString()}`)
+                    .then(res => res.json())
+                    .then(res => {
+                        if (res.success && res.data) {
+                            this.stats = res.data;
+                            this.renderStatsChart();
+                        }
+                    })
+                    .catch(() => {});
+            },
+            openStats() {
+                this.statsVisible = true;
+                this.getStats();
+            },
+            renderStatsChart() {
+                this.$nextTick(() => {
+                    const el = document.getElementById('violationStatsChart');
+                    if (!el || typeof echarts === 'undefined') return;
+                    if (!this.statsChart) {
+                        this.statsChart = echarts.init(el);
+                    }
+                    const data = Array.isArray(this.stats.byType) ? this.stats.byType : [];
+                    const option = {
+                        title: {
+                            text: '违章类型分布',
+                            left: 'center',
+                            top: 5,
+                            textStyle: { fontSize: 14 }
+                        },
+                        tooltip: { trigger: 'item' },
+                        legend: { bottom: 0, type: 'scroll' },
+                        series: [
+                            {
+                                name: '违章类型',
+                                type: 'pie',
+                                radius: ['35%', '65%'],
+                                data: data.map(item => ({
+                                    name: this.getViolationTypeText(item.name),
+                                    value: item.value
+                                })),
+                                label: { formatter: '{b} {c}' }
+                            }
+                        ]
+                    };
+                    if (!data.length) {
+                        option.series[0].data = [{ name: '暂无数据', value: 0 }];
+                    }
+                    this.statsChart.setOption(option);
+                });
+            },
+            getViolationTypeText(type) {
+                const map = {
+                    red_light: '闯红灯',
+                    wrong_way: '逆行',
+                    line_press: '压线',
+                    illegal_parking: '违停',
+                    helmet: '未戴头盔'
+                };
+                if (!type) return '未知';
+                return map[type] || type;
+            },
+            formatDateTime(dateObj) {
+                if (!dateObj) return '';
+                const d = new Date(dateObj);
+                const pad = (n) => (n < 10 ? '0' + n : n);
+                return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+            }
+        }
+    });
+</script>
+</body>
+</html>

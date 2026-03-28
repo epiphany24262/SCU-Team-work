@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>智慧交通管理系统</title>
+    <link rel="stylesheet" href="css/index.css">
+    <link rel="icon" href="favicon.ico" type="image/x-icon">
+    <link rel="stylesheet" href="css/lib/index.min.css">
+</head>
+<body>
+<div class="app-shell">
+    <button class="mobile-menu-toggle" id="mobileMenuToggle">
+        <i class="el-icon-s-fold"></i>
+    </button>
+    <div class="overlay" id="menuOverlay" onclick="toggleMobileMenu()"></div>
+
+    <aside class="left-sidebar" id="sidebar">
+        <div class="sidebar-logo">
+            <div class="brand">
+                <h2>智慧交通</h2>
+                <p>Smart Traffic Platform</p>
+            </div>
+            <button class="collapse-btn" id="collapseBtn" onclick="toggleSidebar()">
+                <i class="el-icon-s-fold"></i>
+            </button>
+        </div>
+        <nav class="sidebar-nav">
+            <ul class="nav-menu" id="navMenu"></ul>
+        </nav>
+    </aside>
+
+    <header class="top-navbar" id="topNavbar">
+        <div class="breadcrumb" id="breadcrumb">数据总览</div>
+
+        <!-- 添加天气模块 -->
+        <div class="weather-widget" id="weatherWidget">
+            <div class="weather-loading">
+                <i class="el-icon-loading"></i> 获取天气...
+            </div>
+        </div>
+
+        <div class="user-info">
+            <div class="user-avatar" id="userAvatar"></div>
+            <div class="user-details">
+                <div class="user-name" id="userName"></div>
+                <div class="user-role" id="userRole"></div>
+            </div>
+            <div class="logout-btn" onclick="logout()">
+                <i class="el-icon-switch-button"></i>
+                <span>退出</span>
+            </div>
+        </div>
+    </header>
+
+    <main class="main-content" id="mainContent">
+        <div class="loading" id="loading" style="display: none;">
+            <div class="loading-spinner"></div>
+            <div>页面加载中...</div>
+        </div>
+        <iframe id="mainFrame" src=""></iframe>
+    </main>
+</div>
+
+<!-- 引入Vue和Element UI（如果使用） -->
+<script src="https://unpkg.com/vue@2/dist/vue.js"></script>
+<script src="https://unpkg.com/element-ui/lib/index.js"></script>
+<script>
+    // 当前登录用户信息
+    let currentUser = null;
+    // 当前活动页面
+    let currentPage = null;
+    // 侧边栏是否折叠
+    let sidebarCollapsed = false;
+    // 移动端菜单是否显示
+    let mobileMenuVisible = false;
+    // 存储天气数据
+    let currentWeatherData = null;
+    // 菜单配置
+    const menuConfig = {
+        manager: {
+            overview: {
+                name: '数据总览',
+                icon: 'el-icon-data-line',
+                url: 'home.html',
+                submenu: null
+            },
+            profile: {
+                name: '个人中心',
+                icon: 'el-icon-user',
+                url: 'personal-center.html',
+                submenu: null
+            },
+            monitoring: {
+                name: '监控中心',
+                icon: 'el-icon-monitor',
+                submenu: [
+                    { name: '实时监控', url: 'carControl.html' },
+                    { name: '处理详情', url: 'process_detail.html' },
+                    { name: '车牌识别', url: 'plate_recognize.html' }
+                ]
+            },
+            map: {
+                name: '地图与轨迹',
+                icon: 'el-icon-map-location',
+                submenu: [
+                    { name: '实时地图', url: 'map.html' },
+                    { name: '追踪回放', url: 'map_history.html' }
+                ]
+            },
+            business: {
+                name: '业务管理',
+                icon: 'el-icon-tickets',
+                submenu: [
+                    { name: '车辆列表', url: 'table1.html' },
+                    { name: '违章记录', url: 'violation-records.html' },
+                    { name: '消息中心', url: 'message.html' }
+                ]
+            },
+            analysis: {
+                name: '统计分析',
+                icon: 'el-icon-pie-chart',
+                submenu: [
+                    { name: '数据统计', url: 'static.html' },
+                    { name: '报表生成', url: 'report-generate.html' },
+                    { name: '趋势分析', url: 'trend-analysis.html' }
+                ]
+            },
+            system: {
+                name: '系统管理',
+                icon: 'el-icon-setting',
+                submenu: [
+                    { name: '用户管理', url: 'user-manage.html' },
+                    { name: '角色权限', url: 'role-manage.html' },
+                    { name: '日志管理', url: 'log-manage.html' }
+                ]
+            }
+        },
+        user: {
+            overview: {
+                name: '数据总览',
+                icon: 'el-icon-data-line',
+                url: 'home.html',
+                submenu: null
+            },
+            profile: {
+                name: '个人中心',
+                icon: 'el-icon-user',
+                url: 'personal-center.html',
+                submenu: null
+            },
+            monitoring: {
+                name: '监控中心',
+                icon: 'el-icon-monitor',
+                submenu: [
+                    { name: '实时监控', url: 'carControl.html' },
+                    { name: '处理详情', url: 'process_detail.html' },
+                    { name: '车牌识别', url: 'plate_recognize.html' }
+                ]
+            },
+            map: {
+                name: '地图与轨迹',
+                icon: 'el-icon-map-location',
+                submenu: [
+                    { name: '实时地图', url: 'map.html' },
+                    { name: '追踪回放', url: 'map_history.html' }
+                ]
+            },
+            business: {
+                name: '业务管理',
+                icon: 'el-icon-tickets',
+                submenu: [
+                    { name: '车辆列表', url: 'table1.html' },
+                    { name: '违章记录', url: 'violation-records.html' },
+                    { name: '消息中心', url: 'message.html' }
+                ]
+            },
+            analysis: {
+                name: '统计分析',
+                icon: 'el-icon-pie-chart',
+                submenu: [
+                    { name: '数据统计', url: 'static.html' }
+                ]
+            }
+        }
+    };
+
+    function checkLogin() {
+        const isLoggedIn = localStorage.getItem('isLoggedIn');
+        const userData = localStorage.getItem('traffic_user');
+
+        // 测试用：如果没有登录信息，模拟一个管理员用户
+        if (!isLoggedIn || !userData) {
+            const testUser = {
+                username: '管理员',
+                role: 'manager'
+            };
+            localStorage.setItem('isLoggedIn', 'true');
+            localStorage.setItem('traffic_user', JSON.stringify(testUser));
+            currentUser = testUser;
+            return true;
+        }
+
+        try {
+            currentUser = JSON.parse(userData);
+            return true;
+        } catch (e) {
+            console.error('解析用户数据失败:', e);
+            window.location.href = 'login.html';
+            return false;
+        }
+    }
+
+    function initUserInterface() {
+        if (!currentUser) return;
+
+        document.getElementById('userName').textContent = currentUser.username;
+        document.getElementById('userRole').textContent =
+            currentUser.role === 'manager' ? '管理员' : '普通用户';
+
+        const avatarEl = document.getElementById('userAvatar');
+        const firstLetter = currentUser.username.charAt(0).toUpperCase();
+        avatarEl.innerHTML = firstLetter;
+
+        generateMenu(currentUser.role);
+        loadDefaultPage();
+        initMobileMenu();
+    }
+
+    function generateMenu(role) {
+        const navMenu = document.getElementById('navMenu');
+        const config = menuConfig[role];
+
+        if (!config) return;
+
+        let menuHTML = '';
+
+        for (const key in config) {
+            const menuItem = config[key];
+
+            if (menuItem.submenu) {
+                menuHTML += `
+                    <li class="nav-item" data-key="${key}">
+                        <a href="javascript:void(0)" class="nav-link dropdown-toggle" onclick="toggleSubMenu('${key}')">
+                            <i class="${menuItem.icon}"></i>
+                            <span>${menuItem.name}</span>
+                        </a>
+                        <ul class="dropdown-menu">
+                            ${menuItem.submenu.map(sub => `
+                                <li><a href="javascript:void(0)" onclick="loadPage('${sub.url}', '${sub.name}')">${sub.name}</a></li>
+                            `).join('')}
+                        </ul>
+                    </li>
+                `;
+            } else {
+                menuHTML += `
+                    <li class="nav-item" data-key="${key}">
+                        <a href="javascript:void(0)" class="nav-link" onclick="loadPage('${menuItem.url}', '${menuItem.name}')">
+                            <i class="${menuItem.icon}"></i>
+                            <span>${menuItem.name}</span>
+                        </a>
+                    </li>
+                `;
+            }
+        }
+
+        navMenu.innerHTML = menuHTML;
+    }
+
+    function toggleSubMenu(key) {
+        const navItem = document.querySelector(`.nav-item[data-key="${key}"]`);
+        const isActive = navItem.classList.contains('active');
+
+        document.querySelectorAll('.nav-item.active').forEach(item => {
+            if (item !== navItem) {
+                item.classList.remove('active');
+            }
+        });
+
+        navItem.classList.toggle('active', !isActive);
+
+        if (window.innerWidth <= 768 && !isActive) {
+            setTimeout(() => {
+                toggleMobileMenu();
+            }, 300);
+        }
+    }
+
+    function toggleSidebar() {
+        sidebarCollapsed = !sidebarCollapsed;
+
+        const sidebar = document.getElementById('sidebar');
+        const mainContent = document.getElementById('mainContent');
+        const topNavbar = document.getElementById('topNavbar');
+        const collapseBtn = document.getElementById('collapseBtn');
+
+        sidebar.classList.toggle('collapsed', sidebarCollapsed);
+        mainContent.classList.toggle('collapsed', sidebarCollapsed);
+        topNavbar.classList.toggle('collapsed', sidebarCollapsed);
+
+        if (sidebarCollapsed) {
+            collapseBtn.innerHTML = '<i class="el-icon-s-unfold"></i>';
+        } else {
+            collapseBtn.innerHTML = '<i class="el-icon-s-fold"></i>';
+        }
+
+        localStorage.setItem('sidebarCollapsed', sidebarCollapsed);
+    }
+
+    function initMobileMenu() {
+        const mobileToggle = document.getElementById('mobileMenuToggle');
+
+        // 初始化时判断屏幕宽度
+        if (window.innerWidth <= 768) {
+            mobileToggle.style.display = 'flex';
+            mobileToggle.style.alignItems = 'center';
+            mobileToggle.style.justifyContent = 'center';
+        } else {
+            mobileToggle.style.display = 'none';
+        }
+
+        mobileToggle.addEventListener('click', toggleMobileMenu);
+
+        // 点击主内容区关闭移动端菜单
+        document.getElementById('mainContent').addEventListener('click', function() {
+            if (mobileMenuVisible) {
+                toggleMobileMenu();
+            }
+        });
+
+        // 窗口大小变化时调整
+        window.addEventListener('resize', function() {
+            if (window.innerWidth <= 768) {
+                mobileToggle.style.display = 'flex';
+                mobileToggle.style.alignItems = 'center';
+                mobileToggle.style.justifyContent = 'center';
+            } else {
+                mobileToggle.style.display = 'none';
+                document.getElementById('sidebar').classList.remove('show');
+                document.getElementById('menuOverlay').classList.remove('show');
+                mobileMenuVisible = false;
+            }
+        });
+    }
+
+    function toggleMobileMenu() {
+        const sidebar = document.getElementById('sidebar');
+        const overlay = document.getElementById('menuOverlay');
+        mobileMenuVisible = !sidebar.classList.contains('show');
+
+        if (mobileMenuVisible) {
+            sidebar.classList.add('show');
+            overlay.classList.add('show');
+        } else {
+            sidebar.classList.remove('show');
+            overlay.classList.remove('show');
+        }
+    }
+
+    // 天气功能函数
+    function initWeatherWidget() {
+        const weatherWidget = document.getElementById('weatherWidget');
+
+        // 模拟获取天气数据（实际项目中应调用天气API）
+        async function fetchWeatherData() {
+            try {
+                // 高德地图天气API
+                const apiUrl = 'https://restapi.amap.com/v3/weather/weatherInfo';
+                const key = '0e0fac0bedb4da6b7f6221b5908f8cff'; // 建议替换为自己的key
+                const city = '510107'; // 成都武侯区
+
+                const response = await fetch(`${apiUrl}?city=${city}&key=${key}`);
+                const data = await response.json();
+
+                if (data.status === '1' && data.lives && data.lives.length > 0) {
+                    const weather = data.lives[0];
+                    // 根据天气状况匹配图标
+                    let icon = 'el-icon-cloudy';
+                    if (weather.weather.includes('晴')) icon = 'el-icon-sunny';
+                    else if (weather.weather.includes('雨')) icon = 'el-icon-rainy';
+                    else if (weather.weather.includes('雪')) icon = 'el-icon-snowy';
+                    else if (weather.weather.includes('风')) icon = 'el-icon-wind';
+
+                    currentWeatherData = {
+                        province: weather.province,
+                        city: weather.city,
+                        temperature: `${weather.temperature}°C`,
+                        description: weather.weather,
+                        icon: icon,
+                        humidity: `${weather.humidity}%`,
+                        wind: `${weather.winddirection}风 ${weather.windpower}级`
+                    };
+                    return currentWeatherData;
+                }
+                throw new Error('天气数据为空');
+            } catch (error) {
+                console.error('获取天气失败:', error);
+                // 模拟数据（API调用失败时使用）
+                currentWeatherData = {
+                    province: '四川省',
+                    city: '成都市',
+                    temperature: '25°C',
+                    description: '多云',
+                    icon: 'el-icon-cloudy',
+                    humidity: '65%',
+                    wind: '东风 2级'
+                };
+                return currentWeatherData;
+            }
+        }
+
+        function updateWeatherUI(data) {
+            weatherWidget.innerHTML = `
+                <div class="weather-content">
+                    <div class="weather-icon">
+                        <i class="${data.icon}"></i>
+                    </div>
+                    <div class="weather-temp">${data.temperature}</div>
+                    <div class="weather-details">
+                        <div class="weather-city">${data.city}</div>
+                        <div class="weather-desc">${data.description}</div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // 初始化获取天气
+        fetchWeatherData().then(data => updateWeatherUI(data));
+
+        // 每小时更新一次天气
+        setInterval(() => {
+            fetchWeatherData().then(data => updateWeatherUI(data));
+        }, 3600000);
+
+        // 点击天气模块显示详情
+        weatherWidget.addEventListener('click', function() {
+            if (currentWeatherData) {
+                const detail = `${currentWeatherData.province} ${currentWeatherData.city}
+\n${currentWeatherData.description} | ${currentWeatherData.temperature}
+\n${currentWeatherData.wind} | 湿度${currentWeatherData.humidity}`;
+
+                if (typeof ELEMENT !== 'undefined' && ELEMENT.MessageBox) {
+                    ELEMENT.MessageBox.alert(detail.replace(/\n/g, '<br>'), '天气详情', {
+                        confirmButtonText: '确定',
+                        dangerouslyUseHTMLString: true
+                    });
+                } else {
+                    alert(detail);
+                }
+            }
+        });
+    }
+
+    function loadPage(pageUrl, menuName = null) {
+        const frame = document.getElementById('mainFrame');
+        const loading = document.getElementById('loading');
+        const breadcrumb = document.getElementById('breadcrumb');
+
+        loading.style.display = 'flex';
+        frame.style.opacity = '0.5';
+
+        currentPage = pageUrl;
+
+        if (menuName) {
+            breadcrumb.textContent = menuName;
+        }
+
+        frame.src = pageUrl;
+
+        updateActiveMenu(pageUrl);
+
+        localStorage.setItem('currentPage', pageUrl);
+
+        if (window.innerWidth <= 768) {
+            toggleMobileMenu();
+        }
+    }
+
+    function updateActiveMenu(pageUrl) {
+        // 清除所有激活状态
+        document.querySelectorAll('.nav-item').forEach(item => {
+            item.classList.remove('nav-active');
+        });
+
+        // 找到对应页面的菜单并激活
+        const allLinks = document.querySelectorAll('.nav-link, .dropdown-menu a');
+        allLinks.forEach(link => {
+            if (link.getAttribute('onclick')?.includes(pageUrl)) {
+                const navItem = link.closest('.nav-item');
+                if (navItem) {
+                    navItem.classList.add('nav-active');
+                }
+            }
+        });
+    }
+
+    function loadDefaultPage() {
+        const savedPage = localStorage.getItem('currentPage');
+        const config = menuConfig[currentUser.role];
+
+        let defaultPage = 'home.html';
+        let defaultName = '数据总览';
+
+        if (savedPage && config) {
+            const isPageValid = Object.values(config).some(menuItem => {
+                if (menuItem.url === savedPage) {
+                    defaultPage = savedPage;
+                    defaultName = menuItem.name;
+                    return true;
+                }
+                if (menuItem.submenu) {
+                    const subItem = menuItem.submenu.find(sub => sub.url === savedPage);
+                    if (subItem) {
+                        defaultPage = savedPage;
+                        defaultName = subItem.name;
+                        return true;
+                    }
+                }
+                return false;
+            });
+
+            if (!isPageValid) {
+                localStorage.removeItem('currentPage');
+            }
+        }
+
+        loadPage(defaultPage, defaultName);
+    }
+
+    function logout() {
+        const confirmText = '确定要退出登录吗？';
+        const confirmTitle = '退出确认';
+
+        if (typeof ELEMENT !== 'undefined' && ELEMENT.MessageBox) {
+            ELEMENT.MessageBox.confirm(confirmText, confirmTitle, {
+                confirmButtonText: '确定',
+                cancelButtonText: '取消',
+                type: 'warning'
+            }).then(() => {
+                performLogout();
+            });
+        } else {
+            if (confirm(confirmText)) {
+                performLogout();
+            }
+        }
+    }
+
+    function performLogout() {
+        localStorage.removeItem('isLoggedIn');
+        localStorage.removeItem('traffic_user');
+        localStorage.removeItem('currentPage');
+        localStorage.removeItem('sidebarCollapsed');
+
+        window.location.href = 'login.html';
+    }
+
+    // 页面加载完成事件
+    document.getElementById('mainFrame').onload = function() {
+        const loading = document.getElementById('loading');
+        loading.style.display = 'none';
+        this.style.opacity = '1';
+    };
+
+    // 页面加载失败处理
+    document.getElementById('mainFrame').onerror = function() {
+        const loading = document.getElementById('loading');
+        loading.innerHTML = `
+            <div style="color: red;">❌ 页面加载失败</div>
+            <button style="margin-top: 10px; padding: 6px 12px; border: none; border-radius: 4px; background: var(--primary); color: white; cursor: pointer;" onclick="loadDefaultPage()">返回首页</button>
+        `;
+        loading.style.display = 'flex';
+    };
+
+    // 键盘快捷键
+    document.addEventListener('keydown', function(e) {
+        // Ctrl+R 或 F5 刷新当前页面
+        if ((e.ctrlKey && e.key === 'r') || e.key === 'F5') {
+            e.preventDefault();
+            if (currentPage) {
+                loadPage(currentPage);
+            }
+        }
+        // Ctrl+← 折叠/展开侧边栏
+        if (e.ctrlKey && e.key === 'ArrowLeft') {
+            e.preventDefault();
+            toggleSidebar();
+        }
+        // ESC 关闭移动端菜单
+        if (e.key === 'Escape' && window.innerWidth <= 768 && mobileMenuVisible) {
+            toggleMobileMenu();
+        }
+    });
+
+    // 页面初始化
+    window.onload = function() {
+        if (!checkLogin()) {
+            return;
+        }
+
+        // 恢复侧边栏折叠状态
+        const savedCollapsed = localStorage.getItem('sidebarCollapsed');
+        if (savedCollapsed === 'true') {
+            sidebarCollapsed = true;
+            setTimeout(() => toggleSidebar(), 100);
+        }
+
+        initUserInterface();
+        initWeatherWidget();
+    };
+
+    // 监听本地存储变化（多标签页同步登出）
+    window.addEventListener('storage', function(e) {
+        if (e.key === 'isLoggedIn' && !e.newValue) {
+            window.location.href = 'login.html';
+        }
+    });
+</script>
+</body>
+</html>

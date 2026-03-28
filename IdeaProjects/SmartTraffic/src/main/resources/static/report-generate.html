@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>报表生成 - 智慧交通管理系统</title>
+    <link rel="stylesheet" href="css/lib/index.min.css">
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            background: #f5f6fa;
+            font-family: "Microsoft YaHei", sans-serif;
+        }
+        .filter-card {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .preview-card {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .chart-container {
+            width: 100%;
+            height: 400px;
+            margin: 20px 0;
+        }
+        .el-button + .el-button {
+            margin-left: 10px;
+        }
+        .tab-content {
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+<div id="app">
+    <!-- 筛选区 -->
+    <div class="filter-card">
+        <el-form :inline="true" :model="filterForm" class="demo-form-inline">
+            <el-form-item label="时间范围">
+                <el-date-picker
+                        v-model="filterForm.timeRange"
+                        type="daterange"
+                        range-separator="至"
+                        start-placeholder="开始日期"
+                        end-placeholder="结束日期"
+                        format="yyyy-MM-dd HH:mm:ss"
+                        value-format="yyyy-MM-dd HH:mm:ss">
+                </el-date-picker>
+            </el-form-item>
+            <el-form-item label="报表类型">
+                <el-select v-model="filterForm.reportType" placeholder="请选择报表类型">
+                    <el-option label="车辆流量报表" value="carFlow"></el-option>
+                    <el-option label="违章统计报表" value="violation"></el-option>
+                    <el-option label="车速分析报表" value="speed"></el-option>
+                </el-select>
+            </el-form-item>
+            <el-form-item label="数据维度">
+                <el-select v-model="filterForm.dimension" placeholder="请选择数据维度">
+                    <el-option label="日" value="day"></el-option>
+                    <el-option label="周" value="week"></el-option>
+                    <el-option label="月" value="month"></el-option>
+                    <el-option label="年" value="year"></el-option>
+                </el-select>
+            </el-form-item>
+            <el-form-item>
+                <el-button type="primary" @click="generateReport">生成报表</el-button>
+            </el-form-item>
+        </el-form>
+    </div>
+
+    <!-- 操作区 -->
+    <div class="filter-card">
+        <el-button type="success" icon="el-icon-download" @click="exportExcel">导出Excel</el-button>
+        <el-button type="warning" icon="el-icon-download" @click="exportPdf">导出PDF</el-button>
+        <el-button type="info" icon="el-icon-printer" @click="printReport">打印报表</el-button>
+    </div>
+
+    <!-- 预览区 -->
+    <div class="preview-card" v-if="reportData.length > 0">
+        <el-tabs v-model="activeTab" type="card">
+            <el-tab-pane label="表格视图" name="table">
+                <div class="tab-content">
+                    <el-table :data="pagedReportData" border style="width: 100%" v-loading="loading">
+                        <el-table-column prop="date" label="时间" width="180"></el-table-column>
+                        <el-table-column prop="value" label="数值" width="180"></el-table-column>
+                        <el-table-column prop="desc" label="描述"></el-table-column>
+                    </el-table>
+                    <el-pagination
+                            @size-change="handleSizeChange"
+                            @current-change="handleCurrentChange"
+                            :current-page="currentPage"
+                            :page-sizes="[10, 20, 50, 100]"
+                            :page-size="pageSize"
+                            layout="total, sizes, prev, pager, next, jumper"
+                            :total="total">
+                    </el-pagination>
+                </div>
+            </el-tab-pane>
+            <el-tab-pane label="图表视图" name="chart">
+                <div class="tab-content">
+                    <div id="reportChart" class="chart-container"></div>
+                </div>
+            </el-tab-pane>
+        </el-tabs>
+    </div>
+
+    <!-- 空数据提示 -->
+    <div v-else class="preview-card" style="text-align: center; padding: 50px;">
+        <el-empty description="暂无报表数据，请先生成报表"></el-empty>
+    </div>
+</div>
+
+<script src="js/lib/vue.min.js"></script>
+<script src="js/lib/index.min.js"></script>
+<script src="js/lib/echarts.min.js"></script>
+<script src="js/lib/axios.min.js"></script>
+<script>
+    new Vue({
+        el: '#app',
+        data() {
+            return {
+                filterForm: {
+                    timeRange: [],
+                    reportType: '',
+                    dimension: ''
+                },
+                activeTab: 'table',
+                reportData: [],
+                loading: false,
+                currentPage: 1,
+                pageSize: 10,
+                total: 0,
+                chart: null, // ECharts实例
+                baseUrl: 'http://localhost:8081/api'
+            }
+        },
+        computed: {
+            pagedReportData() {
+                const start = (this.currentPage - 1) * this.pageSize;
+                return this.reportData.slice(start, start + this.pageSize);
+            }
+        },
+        mounted() {},
+        methods: {
+            // 生成报表
+            generateReport() {
+                if (!this.filterForm.timeRange || !this.filterForm.reportType || !this.filterForm.dimension) {
+                    this.$message.warning('请填写完整筛选条件！');
+                    return;
+                }
+                this.loading = true;
+                const params = this.buildQueryParams();
+                axios.get(`${this.baseUrl}/reports`, { params })
+                    .then(res => {
+                        if (res.data && res.data.success) {
+                            const list = (res.data.data && res.data.data.list) ? res.data.data.list : [];
+                            this.reportData = list;
+                            this.total = list.length;
+                            this.currentPage = 1;
+                            this.$nextTick(() => {
+                                this.ensureChart();
+                                this.updateChart();
+                            });
+                            this.$message.success('报表生成成功！');
+                        } else {
+                            this.$message.error('报表生成失败：' + ((res.data && res.data.message) || '未知错误'));
+                        }
+                    })
+                    .catch(err => {
+                        this.$message.error('报表生成失败：' + err.message);
+                    })
+                    .finally(() => {
+                        this.loading = false;
+                    });
+            },
+            // 更新图表
+            updateChart() {
+                if (!this.chart) {
+                    return;
+                }
+                const xData = this.reportData.map(item => item.date);
+                const yData = this.reportData.map(item => item.value);
+                const option = {
+                    title: { text: this.getReportTitle() },
+                    xAxis: { type: 'category', data: xData },
+                    yAxis: { type: 'value' },
+                    series: [{
+                        data: yData,
+                        type: 'bar',
+                        smooth: true
+                    }],
+                    tooltip: { trigger: 'axis' }
+                };
+                this.chart.setOption(option);
+            },
+            ensureChart() {
+                if (!this.chart && this.activeTab === 'chart') {
+                    const el = document.getElementById('reportChart');
+                    if (el) {
+                        this.chart = echarts.init(el);
+                    }
+                }
+            },
+            // 获取报表标题
+            getReportTitle() {
+                const typeMap = {
+                    carFlow: '车辆流量报表',
+                    violation: '违章统计报表',
+                    speed: '车速分析报表'
+                };
+                const dimMap = {
+                    day: '日维度',
+                    week: '周维度',
+                    month: '月维度',
+                    year: '年维度'
+                };
+                return `${typeMap[this.filterForm.reportType]}（${dimMap[this.filterForm.dimension]}）`;
+            },
+            // 导出Excel
+            exportExcel() {
+                if (!this.filterForm.reportType || !this.filterForm.dimension) {
+                    this.$message.warning('请先选择报表类型和维度！');
+                    return;
+                }
+                const params = this.buildQueryParams();
+                axios.get(`${this.baseUrl}/reports/export/csv`, { params, responseType: 'blob' })
+                    .then(res => {
+                        this.downloadBlob(res, 'report.csv');
+                        this.$message.success('Excel导出成功！');
+                    })
+                    .catch(err => {
+                        this.$message.error('Excel导出失败：' + err.message);
+                    });
+            },
+            // 导出PDF
+            exportPdf() {
+                if (!this.filterForm.reportType || !this.filterForm.dimension) {
+                    this.$message.warning('请先选择报表类型和维度！');
+                    return;
+                }
+                const params = this.buildQueryParams();
+                axios.get(`${this.baseUrl}/reports/export/pdf`, { params, responseType: 'blob' })
+                    .then(res => {
+                        this.downloadBlob(res, 'report.pdf');
+                        this.$message.success('PDF导出成功！');
+                    })
+                    .catch(err => {
+                        this.$message.error('PDF导出失败：' + err.message);
+                    });
+            },
+            // 打印报表
+            printReport() {
+                if (this.reportData.length === 0) {
+                    this.$message.warning('暂无数据可打印！');
+                    return;
+                }
+                const title = this.getReportTitle();
+                let html = '<html><head><title>' + title + '</title>';
+                html += '<style>body{font-family:Microsoft YaHei, sans-serif;padding:20px;}table{width:100%;border-collapse:collapse;}th,td{border:1px solid #ddd;padding:8px;font-size:12px;text-align:left;}th{background:#f5f6fa;}</style>';
+                html += '</head><body>';
+                html += '<h2 style="text-align:center;">' + title + '</h2>';
+                html += '<table><thead><tr><th>时间</th><th>数值</th><th>描述</th></tr></thead><tbody>';
+                this.reportData.forEach(item => {
+                    html += '<tr><td>' + (item.date || '') + '</td><td>' + (item.value || '') + '</td><td>' + (item.desc || '') + '</td></tr>';
+                });
+                html += '</tbody></table>';
+                html += '</body></html>';
+                const win = window.open('', '_blank');
+                win.document.write(html);
+                win.document.close();
+                win.focus();
+                win.print();
+            },
+            buildQueryParams() {
+                const timeRange = this.filterForm.timeRange || [];
+                return {
+                    startTime: timeRange[0] || '',
+                    endTime: timeRange[1] || '',
+                    reportType: this.filterForm.reportType,
+                    dimension: this.filterForm.dimension
+                };
+            },
+            downloadBlob(res, fallbackName) {
+                const blob = new Blob([res.data], { type: res.headers['content-type'] || 'application/octet-stream' });
+                const url = window.URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                const disposition = res.headers['content-disposition'] || '';
+                const match = disposition.match(/filename="?([^";]+)"?/i);
+                const filename = match && match[1] ? decodeURIComponent(match[1]) : fallbackName;
+                link.href = url;
+                link.download = filename;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                window.URL.revokeObjectURL(url);
+            },
+            // 分页相关
+            handleSizeChange(val) {
+                this.pageSize = val;
+            },
+            handleCurrentChange(val) {
+                this.currentPage = val;
+            }
+        },
+        watch: {
+            activeTab(val) {
+                if (val === 'chart' && this.reportData.length > 0) {
+                    this.$nextTick(() => {
+                        this.ensureChart();
+                        this.updateChart();
+                    });
+                }
+            }
+        }
+    });
+</script>
+</body>
+</html>

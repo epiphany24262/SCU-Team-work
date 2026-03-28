@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>趋势分析 - 智慧交通管理系统</title>
+    <link rel="stylesheet" href="css/lib/index.min.css">
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            background: #f5f6fa;
+            font-family: "Microsoft YaHei", sans-serif;
+        }
+        .filter-card {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .content-card {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+        }
+        .chart-container {
+            width: 100%;
+            height: 450px;
+            margin: 20px 0;
+        }
+        .el-table {
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+<div id="app">
+    <!-- 筛选区 -->
+    <div class="filter-card">
+        <el-form :inline="true" :model="filterForm" class="demo-form-inline">
+            <el-form-item label="时间维度">
+                <el-select v-model="filterForm.dimension" @change="refreshAnalysis" placeholder="请选择时间维度">
+                    <el-option label="日" value="day"></el-option>
+                    <el-option label="周" value="week"></el-option>
+                    <el-option label="月" value="month"></el-option>
+                </el-select>
+            </el-form-item>
+            <el-form-item label="指标类型">
+                <el-select v-model="filterForm.indicator" @change="refreshAnalysis" placeholder="请选择指标类型">
+                    <el-option label="车辆流量" value="carFlow"></el-option>
+                    <el-option label="违章次数" value="violation"></el-option>
+                    <el-option label="平均车速" value="speed"></el-option>
+                </el-select>
+            </el-form-item>
+            <el-form-item label="图表类型">
+                <el-select v-model="chartType" @change="refreshChart" placeholder="请选择图表类型">
+                    <el-option label="折线图" value="line"></el-option>
+                    <el-option label="柱状图" value="bar"></el-option>
+                    <el-option label="饼图" value="pie"></el-option>
+                </el-select>
+            </el-form-item>
+            <el-form-item label="对比维度">
+                <el-select v-model="filterForm.compare" @change="refreshAnalysis" placeholder="请选择对比维度">
+                    <el-option label="无对比" value="none"></el-option>
+                    <el-option label="昨日/上周/上月" value="prev"></el-option>
+                </el-select>
+            </el-form-item>
+        </el-form>
+    </div>
+
+    <!-- 内容区 -->
+    <div class="content-card">
+        <!-- 图表区 -->
+        <div id="trendChart" class="chart-container"></div>
+
+        <!-- 数据表格 -->
+        <el-table :data="analysisData" border style="width: 100%" @sort-change="handleSortChange">
+            <el-table-column prop="time" label="时间" sortable width="180"></el-table-column>
+            <el-table-column prop="current" label="当前值" sortable width="180"></el-table-column>
+            <el-table-column prop="prev" label="对比值" v-if="filterForm.compare === 'prev'" width="180"></el-table-column>
+            <el-table-column prop="rate" label="变化率(%)" v-if="filterForm.compare === 'prev'"></el-table-column>
+            <el-table-column prop="desc" label="分析说明"></el-table-column>
+        </el-table>
+
+        <!-- 分页 -->
+        <el-pagination
+                @size-change="handleSizeChange"
+                @current-change="handleCurrentChange"
+                :current-page="currentPage"
+                :page-sizes="[10, 20, 50]"
+                :page-size="pageSize"
+                layout="total, sizes, prev, pager, next, jumper"
+                :total="total"
+                style="margin-top: 20px; text-align: right;">
+        </el-pagination>
+    </div>
+</div>
+
+<script src="js/lib/vue.min.js"></script>
+<script src="js/lib/index.min.js"></script>
+<script src="js/lib/echarts.min.js"></script>
+<script>
+    new Vue({
+        el: '#app',
+        data() {
+            return {
+                filterForm: {
+                    dimension: 'day',
+                    indicator: 'carFlow',
+                    compare: 'none'
+                },
+                chartType: 'line',
+                analysisData: [],
+                currentPage: 1,
+                pageSize: 10,
+                total: 0,
+                chart: null
+            }
+        },
+        mounted() {
+            // 初始化图表
+            this.chart = echarts.init(document.getElementById('trendChart'));
+            // 初始加载数据
+            this.refreshAnalysis();
+        },
+        methods: {
+            // 刷新分析数据
+            refreshAnalysis() {
+                // 模拟接口请求
+                this.analysisData = this.generateMockData();
+                this.total = this.analysisData.length;
+                // 更新图表
+                this.refreshChart();
+            },
+            // 刷新图表
+            refreshChart() {
+                const xData = this.analysisData.map(item => item.time);
+                const yData = this.analysisData.map(item => item.current);
+                const prevData = this.analysisData.map(item => item.prev);
+
+                let series = [{
+                    name: '当前值',
+                    data: yData,
+                    type: this.chartType,
+                    smooth: this.chartType === 'line'
+                }];
+
+                // 对比数据
+                if (this.filterForm.compare === 'prev') {
+                    series.push({
+                        name: '对比值',
+                        data: prevData,
+                        type: this.chartType,
+                        smooth: this.chartType === 'line'
+                    });
+                }
+
+                const option = {
+                    title: { text: this.getChartTitle() },
+                    tooltip: { trigger: 'axis' },
+                    legend: { data: ['当前值', '对比值'].filter(item => this.filterForm.compare === 'prev' || item === '当前值') },
+                    xAxis: this.chartType === 'pie' ? {} : { type: 'category', data: xData },
+                    yAxis: this.chartType === 'pie' ? {} : { type: 'value' },
+                    series: this.chartType === 'pie' ? [{
+                        name: '占比',
+                        type: 'pie',
+                        data: this.analysisData.map(item => ({ name: item.time, value: item.current }))
+                    }] : series
+                };
+
+                this.chart.setOption(option);
+            },
+            // 生成模拟数据
+            generateMockData() {
+                const timeMap = {
+                    day: ['08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00'],
+                    week: ['周一', '周二', '周三', '周四', '周五', '周六', '周日'],
+                    month: ['1日', '2日', '3日', '4日', '5日', '6日', '7日', '8日', '9日', '10日']
+                };
+                const indicatorMap = {
+                    carFlow: '车辆流量',
+                    violation: '违章次数',
+                    speed: '平均车速(km/h)'
+                };
+
+                return timeMap[this.filterForm.dimension].map((time, index) => {
+                    const current = Math.floor(Math.random() * 200) + 50;
+                    const prev = Math.floor(Math.random() * 200) + 50;
+                    const rate = ((current - prev) / prev * 100).toFixed(2);
+                    return {
+                        time,
+                        current,
+                        prev,
+                        rate,
+                        desc: `${time}${indicatorMap[this.filterForm.indicator]}${rate > 0 ? '上升' : rate < 0 ? '下降' : '持平'}${Math.abs(rate)}%`
+                    };
+                });
+            },
+            // 获取图表标题
+            getChartTitle() {
+                const dimMap = { day: '日', week: '周', month: '月' };
+                const indicatorMap = { carFlow: '车辆流量', violation: '违章次数', speed: '平均车速' };
+                return `${indicatorMap[this.filterForm.indicator]}${dimMap[this.filterForm.dimension]}趋势分析`;
+            },
+            // 表格排序
+            handleSortChange(sort) {
+                this.analysisData.sort((a, b) => {
+                    if (sort.order === 'ascending') {
+                        return a[sort.prop] - b[sort.prop];
+                    } else {
+                        return b[sort.prop] - a[sort.prop];
+                    }
+                });
+                this.refreshChart();
+            },
+            // 分页
+            handleSizeChange(val) {
+                this.pageSize = val;
+            },
+            handleCurrentChange(val) {
+                this.currentPage = val;
+            }
+        }
+    });
+</script>
+</body>
+</html>

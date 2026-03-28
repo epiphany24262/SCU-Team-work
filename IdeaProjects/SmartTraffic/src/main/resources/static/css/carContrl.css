@@ -1,0 +1,83 @@
+.monitor-layout {
+    display: flex;
+    gap: 20px;
+    height: calc(100vh - 120px);
+}
+
+.container .page-title {
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.file-panel {
+    width: 350px;
+}
+
+.video-panel {
+    flex: 1;
+}
+
+.panel-header {
+    font-weight: bold;
+}
+
+.file-list {
+    margin-top: 15px;
+}
+
+.list-title {
+    margin-bottom: 10px;
+    font-weight: bold;
+    color: #606266;
+}
+
+.video-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.video-controls {
+    display: flex;
+    gap: 10px;
+}
+
+.video-container {
+    height: 500px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #000;
+}
+
+.video-player {
+    max-width: 100%;
+    max-height: 100%;
+}
+
+.image-preview {
+    max-width: 100%;
+    max-height: 100%;
+}
+
+.no-video {
+    text-align: center;
+    color: #999;
+}
+
+.no-video i {
+    font-size: 60px;
+    margin-bottom: 10px;
+}
+
+.traffic-flow-result .el-message-box__message {
+    max-height: 60vh;
+    overflow-y: auto;
+}
+
+/* 统计结果中的视频样式 */
+.traffic-flow-result video {
+    border-radius: 4px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}

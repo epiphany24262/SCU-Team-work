@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns:v-slot="http://www.w3.org/1999/XSL/Transform">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>用户管理 - 智慧交通管理系统</title>
+    <link rel="stylesheet" href="css/lib/index.min.css">
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            background: #f5f6fa;
+            font-family: "Microsoft YaHei", sans-serif;
+        }
+        .search-card {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .table-card {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+        }
+        .operate-bar {
+            margin-bottom: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .status-tag {
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+        .status-enabled {
+            background: #f0f9ff;
+            color: #1989fa;
+        }
+        .status-disabled {
+            background: #fef2f2;
+            color: #f56c6c;
+        }
+        .role-tag {
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            background: #f5f5f5;
+            color: #666;
+        }
+        .el-table {
+            --el-table-header-text-color: #333;
+            --el-table-row-hover-bg-color: #f8f9fa;
+        }
+        .form-item {
+            margin-bottom: 20px;
+        }
+        /* 修复弹窗层级问题 */
+        .el-dialog {
+            z-index: 3000 !important;
+        }
+        .el-dialog__modal {
+            z-index: 2999 !important;
+        }
+    </style>
+</head>
+<body>
+<div id="app">
+    <!-- 搜索筛选区 -->
+    <div class="search-card">
+        <el-form :inline="true" :model="searchForm" class="demo-form-inline">
+            <el-form-item label="用户名">
+                <el-input v-model="searchForm.username" placeholder="请输入用户名" clearable></el-input>
+            </el-form-item>
+            <el-form-item label="用户角色">
+                <el-select v-model="searchForm.role" placeholder="请选择用户角色" clearable>
+                    <el-option label="管理员" value="manager"></el-option>
+                    <el-option label="普通用户" value="user"></el-option>
+                </el-select>
+            </el-form-item>
+            <el-form-item label="用户状态">
+                <el-select v-model="searchForm.status" placeholder="请选择用户状态" clearable>
+                    <el-option label="启用" value="enabled"></el-option>
+                    <el-option label="禁用" value="disabled"></el-option>
+                </el-select>
+            </el-form-item>
+            <el-form-item>
+                <el-button type="primary" @click="searchUsers">搜索</el-button>
+                <el-button @click="resetSearch">重置</el-button>
+            </el-form-item>
+        </el-form>
+    </div>
+
+    <!-- 表格操作区 + 表格区 -->
+    <div class="table-card">
+        <div class="operate-bar">
+            <el-button type="primary" icon="el-icon-plus" @click="addUser">新增用户</el-button>
+            <div>共 <span style="color: #1989fa; font-weight: bold;">{{ total }}</span> 个系统用户</div>
+        </div>
+
+        <el-table :data="userList" border style="width: 100%" v-loading="loading" @selection-change="handleSelectionChange">
+            <el-table-column type="selection" width="55"></el-table-column>
+            <el-table-column prop="id" label="ID" width="80"></el-table-column>
+            <el-table-column prop="username" label="用户名" width="120"></el-table-column>
+            <el-table-column prop="role" label="用户角色" width="100">
+                <template slot-scope="scope">
+                        <span class="role-tag">
+                            {{ scope.row.role === 'manager' ? '管理员' : '普通用户' }}
+                        </span>
+                </template>
+            </el-table-column>
+            <el-table-column prop="phone" label="手机号" width="150"></el-table-column>
+            <el-table-column prop="createTime" label="创建时间" width="180"></el-table-column>
+            <el-table-column prop="status" label="用户状态" width="100">
+                <template slot-scope="scope">
+                        <span class="status-tag" :class="scope.row.status === 'enabled' ? 'status-enabled' : 'status-disabled'">
+                            {{ scope.row.status === 'enabled' ? '启用' : '禁用' }}
+                        </span>
+                </template>
+            </el-table-column>
+            <el-table-column label="操作" width="300">
+                <template slot-scope="scope">
+                    <el-button type="text" @click="editUser(scope.row)">编辑</el-button>
+                    <el-button type="text" color="#f56c6c" @click="deleteUser(scope.row)">删除</el-button>
+                    <el-button type="text" color="#e6a23c" @click="resetPassword(scope.row)">重置密码</el-button>
+                    <el-button
+                            type="text"
+                            :color="scope.row.status === 'enabled' ? '#f56c6c' : '#1989fa'"
+                            @click="toggleStatus(scope.row)">
+                        {{ scope.row.status === 'enabled' ? '禁用' : '启用' }}
+                    </el-button>
+                </template>
+            </el-table-column>
+        </el-table>
+
+        <!-- 分页控件 -->
+        <el-pagination
+                @size-change="handleSizeChange"
+                @current-change="handleCurrentChange"
+                :current-page="currentPage"
+                :page-sizes="[5, 10, 20, 50]"
+                :page-size="pageSize"
+                layout="total, sizes, prev, pager, next, jumper"
+                :total="total"
+                style="margin-top: 20px; text-align: right;">
+        </el-pagination>
+    </div>
+
+    <!-- 新增/编辑用户弹窗【已确保闭合与状态隔离】 -->
+        <el-dialog
+            :title="isAdd ? '新增用户' : '编辑用户'"
+            :visible.sync="formVisible"
+            width="500px"
+            @close="onFormDialogClose">
+        <el-form :model="userForm" :rules="userRules" ref="userFormRef" label-width="100px">
+            <el-form-item label="用户名" prop="username" class="form-item">
+                <el-input v-model="userForm.username" :disabled="!isAdd" placeholder="请输入用户名"></el-input>
+            </el-form-item>
+            <el-form-item label="密码" prop="password" v-if="isAdd" class="form-item">
+                <el-input v-model="userForm.password" type="password" placeholder="请输入密码（不少于6位）"></el-input>
+            </el-form-item>
+            <el-form-item label="确认密码" prop="confirmPassword" v-if="isAdd" class="form-item">
+                <el-input v-model="userForm.confirmPassword" type="password" placeholder="请再次输入密码"></el-input>
+            </el-form-item>
+            <el-form-item label="用户角色" prop="role" class="form-item">
+                <el-select v-model="userForm.role" placeholder="请选择用户角色">
+                    <el-option label="管理员" value="manager"></el-option>
+                    <el-option label="普通用户" value="user"></el-option>
+                </el-select>
+            </el-form-item>
+            <el-form-item label="手机号" prop="phone" class="form-item">
+                <el-input v-model="userForm.phone" placeholder="请输入手机号"></el-input>
+            </el-form-item>
+            <el-form-item label="用户状态" prop="status" class="form-item">
+                <el-select v-model="userForm.status">
+                    <el-option label="启用" value="enabled"></el-option>
+                    <el-option label="禁用" value="disabled"></el-option>
+                </el-select>
+            </el-form-item>
+        </el-form>
+        <template v-slot:footer>
+            <div class="dialog-footer">
+                <el-button @click="formVisible = false">取消</el-button>
+                <el-button type="primary" @click="submitUserForm">确定</el-button>
+            </div>
+        </template>
+    </el-dialog>
+
+    <!-- 重置密码结果弹窗【已确保闭合】 -->
+        <el-dialog
+            title="重置密码成功"
+            :visible.sync="resetPwdVisible"
+            width="400px"
+            @close="onResetPwdDialogClose">  <!-- 关闭时触发重置 -->
+        <div style="padding: 20px; text-align: center;">
+            <p>用户 <span style="color: #1989fa; font-weight: bold;">{{ resetUserName }}</span> 的新密码为：</p>
+            <el-input v-model="newPassword" readonly style="margin: 20px 0; width: 80%; display: inline-block;"></el-input>
+            <p style="color: #666; font-size: 12px;">请妥善保存并告知用户及时修改！</p>
+        </div>
+        <template v-slot:footer>
+            <div class="dialog-footer">
+                <el-button type="primary" @click="resetPwdVisible = false">确定</el-button>
+            </div>
+        </template>
+    </el-dialog>
+</div>
+
+<script src="js/lib/vue.min.js"></script>
+<script src="js/lib/index.min.js"></script>
+<script>
+    new Vue({
+        el: '#app',
+        data() {
+            // 手机号校验规则
+            const validatePhone = (rule, value, callback) => {
+                if (!value) {
+                    callback();
+                } else if (!/^1[3-9]\d{9}$/.test(value)) {
+                    callback(new Error('请输入正确的手机号'));
+                } else {
+                    callback();
+                }
+            };
+            // 确认密码校验规则
+            const validateConfirmPwd = (rule, value, callback) => {
+                if (!value) {
+                    callback(new Error('请再次输入密码'));
+                } else if (value !== this.userForm.password) {
+                    callback(new Error('两次输入的密码不一致'));
+                } else {
+                    callback();
+                }
+            };
+            return {
+                searchForm: {
+                    username: '',
+                    role: '',
+                    status: ''
+                },
+                userList: [],
+                loading: false,
+                currentPage: 1,
+                pageSize: 10,
+                total: 0,
+                selectedUsers: [],
+                // 表单弹窗相关【状态隔离，避免冲突】
+                formVisible: false,
+                isAdd: true,
+                userForm: {
+                    username: '',
+                    password: '',
+                    confirmPassword: '',
+                    role: '',
+                    phone: '',
+                    status: 'enabled'
+                },
+                userRules: {
+                    username: [{ required: true, message: '请输入用户名', trigger: 'blur' }],
+                    password: [{ required: true, min: 6, message: '密码不少于6位', trigger: 'blur' }],
+                    confirmPassword: [{ validator: validateConfirmPwd, trigger: 'blur' }],
+                    role: [{ required: true, message: '请选择用户角色', trigger: 'change' }],
+                    phone: [{ validator: validatePhone, trigger: 'blur' }],
+                    status: [{ required: true, message: '请选择用户状态', trigger: 'change' }]
+                },
+                // 重置密码相关【状态隔离】
+                resetPwdVisible: false,
+                resetUserName: '',
+                newPassword: ''
+            }
+        },
+        mounted() {
+            this.getUserList();
+        },
+        methods: {
+            // 获取用户列表
+            getUserList() {
+                this.loading = true;
+                const params = new URLSearchParams({
+                    username: this.searchForm.username || '',
+                    role: this.searchForm.role || '',
+                    status: this.searchForm.status || '',
+                    page: this.currentPage,
+                    pageSize: this.pageSize
+                });
+                fetch(`/api/admin/users?${params.toString()}`)
+                    .then(res => res.json())
+                    .then(res => {
+                        if (res.success && res.data) {
+                            const list = Array.isArray(res.data.list) ? res.data.list : [];
+                            this.userList = list;
+                            this.total = res.data.total || 0;
+                        } else {
+                            this.$message.error(res.message || '获取用户列表失败');
+                        }
+                    })
+                    .catch(() => {
+                        this.$message.error('获取用户列表异常');
+                    })
+                    .finally(() => {
+                        this.loading = false;
+                    });
+            },
+            // 搜索与重置
+            searchUsers() { this.currentPage = 1; this.getUserList(); },
+            resetSearch() { this.searchForm = { username: '', role: '', status: '' }; this.getUserList(); },
+            // 分页
+            handleSizeChange(val) { this.pageSize = val; this.getUserList(); },
+            handleCurrentChange(val) { this.currentPage = val; this.getUserList(); },
+            handleSelectionChange(val) { this.selectedUsers = val; },
+            // 新增用户
+            addUser() {
+                this.isAdd = true;
+                this.userForm = {
+                    username: '',
+                    password: '',
+                    confirmPassword: '',
+                    role: '',
+                    phone: '',
+                    status: 'enabled'
+                };
+                this.formVisible = true;
+                this.$nextTick(() => {
+                    if (this.$refs.userFormRef) this.$refs.userFormRef.clearValidate();
+                });
+            },
+            // 编辑用户
+            editUser(user) {
+                this.isAdd = false;
+                this.userForm = {
+                    id: user.id,
+                    username: user.username,
+                    role: user.role,
+                    phone: user.phone,
+                    status: user.status || 'enabled'
+                };
+                this.formVisible = true;
+                this.$nextTick(() => {
+                    if (this.$refs.userFormRef) this.$refs.userFormRef.clearValidate();
+                });
+            },
+            // 提交表单
+            submitUserForm() {
+                this.$refs.userFormRef.validate((valid) => {
+                    if (valid) {
+                        if (this.isAdd) {
+                            fetch('/api/admin/users', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    username: this.userForm.username,
+                                    password: this.userForm.password,
+                                    role: this.userForm.role,
+                                    phone: this.userForm.phone,
+                                    status: this.userForm.status
+                                })
+                            })
+                                .then(res => res.json())
+                                .then(res => {
+                                    if (res.success) {
+                                        this.$message.success(res.message || '新增用户成功！');
+                                        this.formVisible = false;
+                                        this.getUserList();
+                                    } else {
+                                        this.$message.error(res.message || '新增用户失败');
+                                    }
+                                })
+                                .catch(() => this.$message.error('新增用户异常'));
+                        } else {
+                            fetch(`/api/admin/users/${this.userForm.id}`, {
+                                method: 'PUT',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    role: this.userForm.role,
+                                    phone: this.userForm.phone,
+                                    status: this.userForm.status
+                                })
+                            })
+                                .then(res => res.json())
+                                .then(res => {
+                                    if (res.success) {
+                                        this.$message.success(res.message || '编辑用户成功！');
+                                        this.formVisible = false;
+                                        this.getUserList();
+                                    } else {
+                                        this.$message.error(res.message || '编辑用户失败');
+                                    }
+                                })
+                                .catch(() => this.$message.error('编辑用户异常'));
+                        }
+                    } else {
+                        this.$message.error('请填写正确的表单信息！');
+                        return false;
+                    }
+                });
+            },
+            // 删除用户
+            deleteUser(user) {
+                this.$confirm(`确定要删除用户【${user.username}】吗？`, '删除确认', {
+                    type: 'warning'
+                }).then(() => {
+                    fetch(`/api/admin/users/${user.id}`, { method: 'DELETE' })
+                        .then(res => res.json())
+                        .then(res => {
+                            if (res.success) {
+                                this.$message.success(res.message || '删除用户成功！');
+                                this.getUserList();
+                            } else {
+                                this.$message.error(res.message || '删除用户失败');
+                            }
+                        })
+                        .catch(() => this.$message.error('删除用户异常'));
+                }).catch(() => {
+                    this.$message.info('已取消删除');
+                });
+            },
+            // 切换状态
+            toggleStatus(user) {
+                const newStatus = user.status === 'enabled' ? 'disabled' : 'enabled';
+                const tip = newStatus === 'disabled' ? '禁用' : '启用';
+                this.$confirm(`确定要${tip}用户【${user.username}】吗？`, '状态修改', {
+                    type: 'warning'
+                }).then(() => {
+                    fetch(`/api/admin/users/${user.id}/status`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ status: newStatus })
+                    })
+                        .then(res => res.json())
+                        .then(res => {
+                            if (res.success) {
+                                this.$message.success(res.message || `${tip}用户成功！`);
+                                this.getUserList();
+                            } else {
+                                this.$message.error(res.message || `${tip}用户失败`);
+                            }
+                        })
+                        .catch(() => this.$message.error('状态更新异常'));
+                }).catch(() => {
+                    this.$message.info(`已取消${tip}`);
+                });
+            },
+            // 重置密码
+            resetPassword(user) {
+                this.$confirm(`确定要重置用户【${user.username}】的密码吗？`, '重置密码', {
+                    type: 'warning'
+                }).then(() => {
+                    fetch(`/api/admin/users/${user.id}/reset-password`, {
+                        method: 'POST'
+                    })
+                        .then(res => res.json())
+                        .then(res => {
+                            if (res.success && res.data && res.data.newPassword) {
+                                this.resetUserName = user.username;
+                                this.newPassword = res.data.newPassword;
+                                this.resetPwdVisible = true;
+                                this.$alert(`新密码：${res.data.newPassword}`, '密码重置成功', {
+                                    confirmButtonText: '我已保存'
+                                });
+                            } else {
+                                this.$message.error(res.message || '密码重置失败');
+                            }
+                        })
+                        .catch(() => this.$message.error('密码重置异常'));
+                }).catch(() => {
+                    this.$message.info('已取消重置密码');
+                });
+            },
+            // 表单弹窗关闭时的重置逻辑【关键：防止状态残留】
+            onFormDialogClose() {
+                this.userForm = {
+                    username: '',
+                    password: '',
+                    confirmPassword: '',
+                    role: '',
+                    phone: '',
+                    status: 'enabled'
+                };
+                if (this.$refs.userFormRef) this.$refs.userFormRef.clearValidate();
+            },
+            // 重置密码弹窗关闭时的重置逻辑
+            onResetPwdDialogClose() {
+                this.resetUserName = '';
+                this.newPassword = '';
+            }
+        }
+    });
+</script>
+</body>
+</html>

@@ -1,0 +1,147 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>统计分析界面 - 智慧旅游平台</title>
+    <link rel="stylesheet" href="css/lib/index.min.css">
+    <link rel="stylesheet" href="css/static.css">
+</head>
+<body>
+<div id="app">
+    <!-- 内容区域 -->
+    <div class="container">
+        <div class="page-title">
+            <i class="el-icon-data-analysis"></i>
+            <span>统计概况 - 2023年11月6日</span>
+        </div>
+
+        <!-- 错误提示 -->
+        <div v-if="error" class="error-message">
+            {{ error }}
+        </div>
+
+        <!-- 统计卡片 -->
+        <div class="stats-cards">
+            <div class="stat-card">
+                <div class="stat-title">总车辆数</div>
+                <div class="stat-value">{{ overview.total_vehicles || '--' }}台</div>
+            </div>
+            <div class="stat-card danger">
+                <div class="stat-title">总记录数</div>
+                <div class="stat-value">{{ overview.total_records || '--' }}条</div>
+            </div>
+            <div class="stat-card success">
+                <div class="stat-title">平均速度</div>
+                <div class="stat-value">{{ overview.avg_speed || '--' }} km/h</div>
+            </div>
+        </div>
+
+        <!-- 图表区域 -->
+        <div class="chart-container">
+            <div class="chart-title">24小时车流量统计</div>
+            <div v-if="loading" class="loading">
+                <i class="el-icon-loading"></i> 加载中...
+            </div>
+            <div v-else id="hourlyChart"></div>
+        </div>
+    </div>
+</div>
+
+<!-- 引入Vue和Element UI -->
+<script src="js/lib/vue.min.js"></script>
+<script src="js/lib/index.min.js"></script>
+<script src="js/lib/axios.min.js"></script>
+<script src="js/lib/echarts.min.js"></script>
+<script>
+    new Vue({
+        el: '#app',
+        data: {
+            overview: {},
+            chartData: {},
+            loading: false,
+            error: '',
+            chart: null
+        },
+        mounted() {
+            this.initChart();
+            this.initData();
+            window.addEventListener('resize', () => {
+                if (this.chart) this.chart.resize();
+            });
+        },
+        methods: {
+            // 初始化图表
+            initChart() {
+                const chartDom = document.getElementById('hourlyChart');
+                this.chart = echarts.init(chartDom);
+                const option = {
+                    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+                    grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
+                    xAxis: { type: 'category', data: [], axisLabel: { color: '#606266' } },
+                    yAxis: { type: 'value', name: '车辆数', axisLabel: { color: '#606266' } },
+                    series: [{
+                        name: '车流量',
+                        type: 'bar',
+                        data: [],
+                        itemStyle: { color: '#409EFF' },
+                        label: { show: true, position: 'top', color: '#303133' }
+                    }]
+                };
+                this.chart.setOption(option);
+            },
+
+            // 加载概览数据
+            async loadOverview() {
+                try {
+                    this.loading = true;
+                    console.log('开始请求概览数据');
+                    const response = await axios.post('/api/statistics/overview');
+                    console.log('概览数据响应:', response);
+                    this.overview = response.data;
+                } catch (error) {
+                    this.error = '加载概览数据失败';
+                    this.overview = {
+                        total_vehicles: 156,
+                        alarm_count: 23,
+                        total_records: 892,
+                        avg_speed: 45.6
+                    };
+                } finally {
+                    this.loading = false;
+                }
+            },
+
+            // 加载车流量数据
+            async loadHourlyTraffic() {
+                try {
+                    const response = await axios.post('/api/statistics/hourly-traffic');
+                    const data = response.data;
+                    this.chart.setOption({
+                        xAxis: { data: data.hours },
+                        series: [{ data: data.counts }]
+                    });
+                } catch (error) {
+                    this.error = '加载车流量数据失败';
+                    const mockData = {
+                        hours: ['00时', '01时', '02时', '03时', '04时', '05时', '06时', '07时', '08时', '09时', '10时', '11时',
+                            '12时', '13时', '14时', '15时', '16时', '17时', '18时', '19时', '20时', '21时', '22时', '23时'],
+                        counts: [15, 12, 8, 6, 5, 7, 25, 42, 56, 48, 52, 58, 45, 52, 48, 56, 62, 58, 52, 48, 42, 35, 28, 18]
+                    };
+                    this.chart.setOption({
+                        xAxis: { data: mockData.hours },
+                        series: [{ data: mockData.counts }]
+                    });
+                }
+            },
+
+            // 初始化所有数据
+            async initData() {
+                await this.loadOverview();
+                await this.loadHourlyTraffic();
+            }
+        }
+    });
+</script>
+</body>
+</html>

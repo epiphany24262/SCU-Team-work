@@ -1,0 +1,105 @@
+/* 第一个文件的非顶部样式 */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    background-color: #f5f7fa;
+    color: #303133;
+    line-height: 1.5;
+}
+
+.container {
+    padding: 20px;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.page-title {
+    font-size: 18px;
+    margin-bottom: 20px;
+    color: #303133;
+    display: flex;
+    align-items: center;
+}
+
+.page-title i {
+    margin-right: 8px;
+    color: #409EFF;
+}
+
+.stats-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 15px;
+    margin-bottom: 20px;
+}
+
+.stat-card {
+    background: white;
+    border-radius: 4px;
+    padding: 15px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    border-left: 4px solid #409EFF;
+}
+
+.stat-card.warning {
+    border-left-color: #E6A23C;
+}
+
+.stat-card.danger {
+    border-left-color: #F56C6C;
+}
+
+.stat-card.success {
+    border-left-color: #67C23A;
+}
+
+.stat-title {
+    font-size: 14px;
+    color: #909399;
+    margin-bottom: 8px;
+}
+
+.stat-value {
+    font-size: 22px;
+    font-weight: 500;
+}
+
+.chart-container {
+    background: white;
+    border-radius: 4px;
+    padding: 20px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    margin-top: 20px;
+}
+
+.chart-title {
+    font-size: 16px;
+    margin-bottom: 15px;
+    color: #303133;
+}
+
+#hourlyChart {
+    height: 400px;
+    width: 100%;
+}
+
+.loading {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 200px;
+    color: #909399;
+}
+
+.error-message {
+    background: #fef0f0;
+    color: #f56c6c;
+    padding: 10px;
+    border-radius: 4px;
+    margin: 10px 0;
+}

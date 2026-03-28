@@ -1,0 +1,495 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>伴车星GPS数据采集系统</title>
+    <link rel="stylesheet" href="css/lib/index.min.css">
+    <link rel="stylesheet" href="css/map.css">
+</head>
+<body>
+<div id="app">
+    <!-- 主内容区 -->
+    <div class="map-container">
+        <!-- 左侧：地图 -->
+        <div class="map-left">
+            <div id="map_box"></div>
+
+            <!-- 地图控制按钮 -->
+            <div class="map-tools">
+                <el-button-group>
+                    <el-button size="small" icon="el-icon-zoom-out" @click="mapZoomOut" title="缩小"></el-button>
+                    <el-button size="small" icon="el-icon-zoom-in" @click="mapZoomIn" title="放大"></el-button>
+                    <el-button size="small" icon="el-icon-refresh" @click="manualRefresh"
+                               :loading="isLoading" title="手动刷新"></el-button>
+                </el-button-group>
+            </div>
+        </div>
+
+        <!-- 右侧：控制面板 -->
+        <div class="map-right">
+            <div class="tab-header">
+                <div class="tab-item" :class="{active: activeTab === 'vehicle'}" @click="activeTab = 'vehicle'">
+                    车辆列表
+                </div>
+                <div class="tab-item" :class="{active: activeTab === 'control'}" @click="activeTab = 'control'">
+                    采集控制
+                </div>
+            </div>
+
+            <div class="tab-content">
+                <!-- 车辆列表标签 -->
+                <div class="tab-pane" :class="{active: activeTab === 'vehicle'}">
+                    <div class="table-container">
+                        <el-table
+                                :data="vehicleList"
+                                style="width: 100%"
+                                size="small"
+                                stripe>
+                            <el-table-column prop="tname" label="名称" width="60"></el-table-column>
+                            <el-table-column prop="speed" label="速度km/h" width="50"></el-table-column>
+                            <el-table-column prop="status" label="状态" width="60"></el-table-column>
+                            <el-table-column prop="location" label="位置" width="90"></el-table-column>
+                            <el-table-column prop="time" label="时间" width="90"></el-table-column>
+                        </el-table>
+                    </div>
+                    <div class="last-update">共 {{ vehicleList.length }} 辆车 | 最后更新: {{ lastUpdate }}</div>
+                </div>
+
+                <!-- 采集控制标签 -->
+                <div class="tab-pane" :class="{active: activeTab === 'control'}">
+                    <!-- 控制面板 -->
+                    <div class="control-section">
+                        <div class="control-title">
+                            <i class="el-icon-video-play"></i>
+                            采集控制
+                        </div>
+
+                        <div class="control-item">
+                            <div class="control-label">采集间隔（秒）</div>
+                            <el-input-number
+                                    v-model="collectInterval"
+                                    :min="10"
+                                    :max="300"
+                                    :disabled="isCollecting"
+                                    size="small"
+                                    style="width: 100%">
+                            </el-input-number>
+                        </div>
+
+                        <div class="control-item">
+                            <div class="control-label">采集状态</div>
+                            <div class="control-value">
+                                <span :style="{color: isCollecting ? '#52c41a' : '#f5222d'}">
+                                    {{ isCollecting ? '运行中' : '已停止' }}
+                                </span>
+                            </div>
+                        </div>
+
+                        <el-button
+                                type="primary"
+                                :icon="isCollecting ? 'el-icon-video-pause' : 'el-icon-video-play'"
+                                @click="toggleCollection"
+                                :loading="isLoading"
+                                class="control-button">
+                            {{ isCollecting ? '停止采集' : '开始采集' }}
+                        </el-button>
+                    </div>
+
+
+
+                    <!-- 运行日志 -->
+                    <div class="control-section">
+                        <div class="control-title">
+                            <i class="el-icon-document"></i>
+                            运行日志
+                        </div>
+
+                        <div class="log-container">
+                            <div v-if="logs.length === 0" style="text-align: center; color: #999; padding: 20px;">
+                                暂无日志
+                            </div>
+
+                            <div v-for="log in logs" :key="log.id" class="log-entry">
+                                <div class="log-time">{{ log.time }}</div>
+                                <div :class="'log-' + log.type">{{ log.message }}</div>
+                            </div>
+                        </div>
+
+                        <el-button
+                                size="small"
+                                @click="clearLogs"
+                                class="clear-logs-btn">
+                            清空日志
+                        </el-button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 引入Vue和Element UI（本地版本） -->
+<script src="js/lib/vue.min.js"></script>
+<script src="js/lib/index.min.js"></script>
+<script src="js/lib/axios.min.js"></script>
+<script type="text/javascript" src="http://api.map.baidu.com/api?v=2.0&ak=PI3VfWo5wYHDlj0fziHeQiKL4jMT1DEw"></script>
+
+<script>
+    new Vue({
+        el: '#app',
+        data() {
+            return {
+                // 标签页状态
+                activeTab: 'vehicle',
+
+                // 采集状态
+                isCollecting: false,
+                isLoading: false,
+                collectInterval: 10,
+                collectTimer: null,
+
+                // 车辆数据
+                vehicleList: [],
+
+                // 运行日志
+                logs: [],
+                lastUpdate: '--:--:--',
+
+                // 地图实例
+                map: null
+            };
+        },
+        mounted() {
+            this.initMap();
+            this.addLog('系统初始化完成', 'info');
+            this.manualRefresh();
+        },
+        beforeDestroy() {
+            this.stopCollection();
+        },
+        methods: {
+            // 初始化地图
+            initMap() {
+                this.map = new BMap.Map('map_box');
+                const chinaCenter = new BMap.Point(104.06, 35.86);
+                // 设置缩放级别为5，这个级别能显示中国全图
+                this.map.centerAndZoom(chinaCenter, 5);
+                this.map.enableScrollWheelZoom(true);
+                this.map.addControl(new BMap.ScaleControl());
+            },
+
+            // 切换采集状态
+            toggleCollection() {
+                if (this.isCollecting) {
+                    this.stopCollection();
+                } else {
+                    this.startCollection();
+                }
+            },
+
+            // 开始采集（完全由前端控制）
+            startCollection() {
+                this.isLoading = true;
+                this.addLog('正在启动数据采集...', 'info');
+
+                // 不需要调用后端启动，直接设置状态
+                this.isCollecting = true;
+
+                // 立即获取一次数据
+                this.fetchData().then(() => {
+                    this.addLog(`数据采集已启动，间隔${this.collectInterval}秒`, 'success');
+                }).catch(error => {
+                    this.addLog('启动失败: ' + error.message, 'error');
+                    this.isCollecting = false;
+                }).finally(() => {
+                    this.isLoading = false;
+                    // 启动前端定时器
+                    if (this.isCollecting) {
+                        this.startCollectTimer();
+                    }
+                });
+            },
+
+            // 停止采集（只停止前端定时器）
+            stopCollection() {
+                if (this.collectTimer) {
+                    clearTimeout(this.collectTimer);
+                    this.collectTimer = null;
+                }
+
+                this.isCollecting = false;
+                this.addLog('数据采集已停止', 'info');
+            },
+
+            // 启动定时采集器
+            startCollectTimer() {
+                if (!this.isCollecting) return;
+
+                // 清除已有定时器
+                if (this.collectTimer) {
+                    clearTimeout(this.collectTimer);
+                }
+
+                const collect = async () => {
+                    if (!this.isCollecting) return;
+
+                    try {
+                        await this.fetchData();
+                    } catch (error) {
+                        console.error('采集数据失败:', error);
+                        // 出错时也继续下一次采集
+                    }
+
+                    // 继续下一次采集
+                    if (this.isCollecting) {
+                        this.collectTimer = setTimeout(collect, this.collectInterval * 1000);
+                    }
+                };
+
+                this.collectTimer = setTimeout(collect, this.collectInterval * 1000);
+            },
+
+            // 获取数据（这个就是采集数据）
+            async fetchData() {
+                try {
+                    // 调用后端获取最新数据（这里就包含了采集）
+                    const response = await axios.get('/api/collection/data');
+
+                    if (response.data.success) {
+                        this.updateVehicleData(response.data.data);
+                        this.lastUpdate = new Date().toLocaleTimeString();
+
+                        return true;
+                    } else {
+                        throw new Error(response.data.message || '获取数据失败');
+                    }
+                } catch (error) {
+                    this.addLog('获取数据失败: ' + error.message, 'error');
+                    throw error;
+                }
+            },
+
+            // 更新车辆数据
+            updateVehicleData(data) {
+                // 更新车辆列表
+                if (data.vehicles && Array.isArray(data.vehicles)) {
+                    this.vehicleList = data.vehicles.map(vehicle => ({
+                        tname: vehicle.tname || '未知',
+                        sn: vehicle.sn || '未知',
+                        speed: vehicle.speed || 0,
+                        status: this.getStatusText(vehicle),
+                        location: vehicle.address || vehicle.city || '未知位置',
+                        time: this.formatTime(vehicle.gpsTime) || new Date().toLocaleTimeString()
+                    }));
+                }
+                // 更新地图标记
+                this.updateMapMarkers(data.vehicles);
+            },
+
+            // 获取状态文本
+            getStatusText(vehicle) {
+                if (vehicle.status === 'offline') return '离线';
+                return vehicle.speed > 0 ? '行驶中' : '已停车';
+            },
+
+            // 获取状态颜色
+            getStatusColor(status) {
+                switch(status) {
+                    case '行驶中': return '#52c41a';
+                    case '已停车': return '#faad14';
+                    case '离线': return '#f5222d';
+                    default: return '#666';
+                }
+            },
+
+            // 更新地图标记
+            updateMapMarkers(vehicles) {
+                this.map.clearOverlays();
+
+                vehicles?.forEach(vehicle => {
+                    if (vehicle.lat && vehicle.lng) {
+                        const point = new BMap.Point(vehicle.lng, vehicle.lat);
+                        // 根据dir字段获取对应的图标文件名
+                        const iconFileName = this.getDirectionIcon(vehicle.dir);
+                        const icon = new BMap.Icon(
+                            `image/map/${iconFileName}`,  // 动态选择图标
+                            new BMap.Size(30, 30),
+                            { offset: new BMap.Size(15, 30) }
+                        );
+                        const marker = new BMap.Marker(point, { icon: icon });
+
+                        // 直接添加文字标签（不用点击就能看到）
+                        const label = new BMap.Label(vehicle.tname || '未知', {
+                            offset: new BMap.Size(20, -10)
+                        });
+
+                        label.setStyle({
+                            color: '#fff',
+                            fontSize: '12px',
+                            backgroundColor: '#1890ff',
+                            padding: '3px 8px',
+                            borderRadius: '12px',
+                            border: 'none'
+                        });
+
+                        marker.setLabel(label);
+
+                        // 保留原有的点击信息窗口
+                        const infoWindow = new BMap.InfoWindow(`
+                            <div style="padding:6px;">
+                                <h4 style="margin:0 0 4px 0;color:#1890ff;font-size:13px;">${vehicle.tname}</h4>
+                                <p style="margin:2px 0;font-size:11px;">速度: ${vehicle.speed || 0} km/h</p>
+                                <p style="margin:2px 0;font-size:11px;">方向: ${this.getDirectionText(vehicle.dir)}</p>
+                                <p style="margin:2px 0;font-size:11px;">状态: ${this.getStatusText(vehicle)}</p>
+                                <p style="margin:2px 0;font-size:11px;">位置: ${vehicle.address || '未知'}</p>
+                                <p style="margin:2px 0;font-size:11px;">时间: ${this.formatTime(vehicle.gpsTime) || '未知'}</p>
+                                <div style="margin-top:4px; border-top:1px solid #eee; padding-top:4px;">
+                                    <a href="/map_history.html?sn=${vehicle.sn}" style="color:#1890ff;font-size:11px;">
+                                        ▶ 查看回放
+                                    </a>
+                                </div>
+                            </div>`
+                        );
+
+                        marker.addEventListener('click', () => {
+                            this.map.openInfoWindow(infoWindow, point);
+                        });
+
+                        this.map.addOverlay(marker);
+                    }
+                });
+            },
+
+            // 根据dir角度获取对应的图标文件名
+            getDirectionIcon(dir) {
+                if (dir === undefined || dir === null) return 'car_w.png';
+
+                // 标准化角度到0-360度
+                const normalizedDir = (dir % 360 + 360) % 360;
+
+                // 8个方向的分区（每个45度）
+                if (normalizedDir >= 337.5 || normalizedDir < 22.5) {
+                    return 'car_n.png';      // 北 (0°)
+                } else if (normalizedDir >= 22.5 && normalizedDir < 67.5) {
+                    return 'car_wn.png';     // 西北 (45°)
+                } else if (normalizedDir >= 67.5 && normalizedDir < 112.5) {
+                    return 'car_w.png';      // 西 (90°)
+                } else if (normalizedDir >= 112.5 && normalizedDir < 157.5) {
+                    return 'car_ws.png';     // 西南 (135°)
+                } else if (normalizedDir >= 157.5 && normalizedDir < 202.5) {
+                    return 'car_s.png';      // 南 (180°)
+                } else if (normalizedDir >= 202.5 && normalizedDir < 247.5) {
+                    return 'car_es.png';     // 东南 (225°)
+                } else if (normalizedDir >= 247.5 && normalizedDir < 292.5) {
+                    return 'car_e.png';      // 东 (270°)
+                } else if (normalizedDir >= 292.5 && normalizedDir < 337.5) {
+                    return 'car_en.png';     // 东北 (315°)
+                }
+
+                return 'carMark.png';
+            },
+
+            // 获取方向文本描述
+            getDirectionText(dir) {
+                if (dir === undefined || dir === null) return '未知';
+
+                const normalizedDir = (dir % 360 + 360) % 360;
+
+                const directions = [
+                    { min: 337.5, max: 22.5, name: '北' },
+                    { min: 22.5, max: 67.5, name: '西北' },
+                    { min: 67.5, max: 112.5, name: '西' },
+                    { min: 112.5, max: 157.5, name: '西南' },
+                    { min: 157.5, max: 202.5, name: '南' },
+                    { min: 202.5, max: 247.5, name: '东南' },
+                    { min: 247.5, max: 292.5, name: '东' },
+                    { min: 292.5, max: 337.5, name: '东北' }
+                ];
+
+                for (let direction of directions) {
+                    if (normalizedDir >= direction.min && normalizedDir < direction.max) {
+                        return direction.name;
+                    } else if (direction.min > direction.max) {
+                        // 处理跨0度的情况（北方向）
+                        if (normalizedDir >= direction.min || normalizedDir < direction.max) {
+                            return direction.name;
+                        }
+                    }
+                }
+
+                return '未知';
+            },
+
+            // 时间格式化
+            formatTime(timeString) {
+                if (!timeString) return '未知';
+
+                try {
+                    // 解析 ISO 时间格式
+                    const date = new Date(timeString);
+
+                    // 转换为本地时间显示
+                    const year = date.getFullYear();
+                    const month = String(date.getMonth() + 1).padStart(2, '0');
+                    const day = String(date.getDate()).padStart(2, '0');
+                    const hour = String(date.getHours()).padStart(2, '0');
+                    const minute = String(date.getMinutes()).padStart(2, '0');
+                    const second = String(date.getSeconds()).padStart(2, '0');
+
+                    return `${year}-${month}-${day} ${hour}:${minute}:${second}`;
+                } catch (e) {
+                    return timeString; // 如果解析失败，返回原字符串
+                }
+            },
+
+            // 手动刷新
+            async manualRefresh() {
+                if (!this.isCollecting) {
+                    this.isLoading = true;
+                    this.addLog('正在手动获取数据...', 'info');
+                    await this.fetchData();
+                    this.isLoading = false;
+                }
+            },
+
+            // 地图缩放
+            mapZoomOut() {
+                if (this.map) {
+                    this.map.zoomOut();
+                }
+            },
+
+            mapZoomIn() {
+                if (this.map) {
+                    this.map.zoomIn();
+                }
+            },
+
+            // 添加日志
+            addLog(message, type = 'info') {
+                const log = {
+                    id: Date.now(),
+                    time: new Date().toLocaleTimeString(),
+                    message: message,
+                    type: type
+                };
+
+                this.logs.unshift(log);
+
+                // 限制日志数量
+                if (this.logs.length > 50) {
+                    this.logs = this.logs.slice(0, 50);
+                }
+            },
+
+            // 清空日志
+            clearLogs() {
+                this.logs = [];
+                this.addLog('日志已清空', 'info');
+            }
+        }
+    });
+</script>
+</body>
+</html>

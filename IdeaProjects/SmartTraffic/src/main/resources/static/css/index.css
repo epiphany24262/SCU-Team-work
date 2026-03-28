@@ -1,0 +1,539 @@
+/* 全局变量定义 */
+:root {
+    --sidebar-width: 270px;
+    --sidebar-collapsed-width: 78px;
+    --topbar-height: 66px;
+    --surface: #ffffff;
+    --bg: #f5f7fb;
+    --primary: #2a5298;
+    --primary-dark: #122449;
+    --sidebar-glow: rgba(70, 130, 255, 0.35);
+    --text-primary: #1f2a37;
+    --text-secondary: #6b7280;
+    --border: #e5e7eb;
+    --shadow: 0 10px 30px rgba(15, 23, 42, 0.12);
+}
+
+/* 全局重置 */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Microsoft YaHei', sans-serif;
+    background: var(--bg);
+    color: var(--text-primary);
+    height: 100vh;
+    overflow: hidden;
+}
+
+.app-shell {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+/* 左侧侧边栏 */
+.left-sidebar {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: var(--sidebar-width);
+    background: radial-gradient(circle at top, rgba(70, 130, 255, 0.25), transparent 45%),
+    linear-gradient(180deg, #0f1b3d 0%, #172d5f 60%, #1c3f88 100%);
+    color: #fff;
+    transition: width 0.3s ease, transform 0.3s ease;
+    z-index: 1200;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 20px 45px rgba(10, 25, 60, 0.35);
+    border-right: 1px solid rgba(255, 255, 255, 0.08);
+    overflow-y: auto;
+}
+
+.left-sidebar.collapsed {
+    width: var(--sidebar-collapsed-width);
+}
+
+.left-sidebar.show {
+    transform: translateX(0);
+}
+
+.sidebar-logo {
+    padding: 18px 20px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.sidebar-logo .brand {
+    display: flex;
+    flex-direction: column;
+}
+
+.sidebar-logo h2 {
+    margin: 0;
+    font-size: 22px;
+    letter-spacing: 2px;
+}
+
+.sidebar-logo p {
+    margin: 4px 0 0 0;
+    font-size: 12px;
+    opacity: 0.75;
+}
+
+.collapse-btn {
+    background: rgba(255, 255, 255, 0.18);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: #fff;
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 8px 18px rgba(10, 25, 60, 0.35);
+    border: none;
+}
+
+.sidebar-nav {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px 0 24px;
+}
+
+.nav-menu {
+    list-style: none;
+    margin: 0;
+    padding: 0 14px;
+}
+
+.nav-item {
+    margin: 6px 0;
+}
+
+.nav-link {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 13px 16px;
+    border-radius: 14px;
+    color: #eef3ff;
+    text-decoration: none;
+    cursor: pointer;
+    transition: all 0.25s ease;
+    border: 1px solid transparent;
+    background: rgba(255, 255, 255, 0.02);
+}
+
+.nav-link:hover {
+    background: rgba(255, 255, 255, 0.14);
+    border-color: rgba(255, 255, 255, 0.2);
+    color: #fff;
+    box-shadow: 0 10px 24px rgba(10, 25, 60, 0.35);
+}
+
+.nav-item.nav-active .nav-link {
+    background: linear-gradient(135deg, rgba(70, 130, 255, 0.4), rgba(255, 255, 255, 0.12));
+    color: #fff;
+    box-shadow: 0 12px 28px rgba(20, 50, 120, 0.35);
+    border-color: rgba(255, 255, 255, 0.28);
+}
+
+.nav-link i {
+    font-size: 19px;
+    width: 24px;
+    text-align: center;
+    color: #dbe6ff;
+}
+
+.nav-link span {
+    font-size: 15px;
+    font-weight: 500;
+    white-space: nowrap;
+    letter-spacing: 0.5px;
+}
+
+.dropdown-toggle::after {
+    content: '▾';
+    margin-left: auto;
+    font-size: 12px;
+    transition: transform 0.2s ease;
+}
+
+.nav-item.active .dropdown-toggle::after {
+    transform: rotate(180deg);
+}
+
+.dropdown-menu {
+    list-style: none;
+    margin: 8px 0 0 0;
+    padding: 6px 0 0 30px;
+    display: none;
+}
+
+.nav-item.active .dropdown-menu {
+    display: block;
+}
+
+.dropdown-menu li a {
+    display: block;
+    padding: 9px 12px;
+    border-radius: 10px;
+    color: rgba(255, 255, 255, 0.88);
+    text-decoration: none;
+    font-size: 13px;
+    transition: all 0.2s ease;
+}
+
+.dropdown-menu li a:hover {
+    background: rgba(255, 255, 255, 0.12);
+    color: #fff;
+}
+
+/* 折叠状态隐藏文字 */
+.left-sidebar.collapsed .nav-link span,
+.left-sidebar.collapsed .dropdown-toggle::after,
+.left-sidebar.collapsed .dropdown-menu {
+    display: none !important;
+}
+
+.left-sidebar.collapsed .sidebar-logo .brand {
+    display: none;
+}
+
+/* 顶部导航栏 */
+.top-navbar {
+    position: fixed;
+    top: 0;
+    left: var(--sidebar-width);
+    right: 0;
+    height: var(--topbar-height);
+    background: var(--surface);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 20px;
+    box-shadow: var(--shadow);
+    z-index: 1100;
+    transition: left 0.3s ease;
+}
+
+.top-navbar.collapsed {
+    left: var(--sidebar-collapsed-width);
+}
+
+.breadcrumb {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-primary);
+    flex: 1;
+    margin-right: auto;
+}
+
+/* 天气模块 - 纯白背景、无默认边框/阴影、悬浮淡灰边框 */
+.weather-widget {
+    display: flex;
+    align-items: center;
+    background: #ffffff; /* 纯白背景 */
+    border-radius: 20px;
+    padding: 6px 12px;
+    margin: 0 15px 0 auto;
+    box-shadow: none !important; /* 彻底移除所有阴影 */
+    border: none !important; /* 强制移除所有默认边框（包括继承的） */
+    outline: none !important; /* 移除焦点轮廓 */
+    min-width: 120px;
+    max-width: 150px;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: all 0.2s ease; /* 悬浮过渡更丝滑 */
+}
+
+/* 鼠标悬浮 - 仅显示一层淡灰色边框（无叠加） */
+.weather-widget:hover {
+    border: 1px solid #e0e0e0 !important; /* 淡灰色边框（#e0e0e0是浅灰，可微调） */
+    box-shadow: none !important; /* 确保没有阴影叠加 */
+}
+
+/* 以下保持原有，仅适配样式 */
+.weather-content {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+}
+
+.weather-icon {
+    font-size: 20px;
+    color: #666666; /* 图标也换成灰色系，更协调 */
+    flex-shrink: 0;
+}
+
+.weather-temp {
+    font-size: 16px;
+    font-weight: 600;
+    color: #555555; /* 温度文字灰色 */
+    flex-shrink: 0;
+}
+
+.weather-details {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+    flex: 1;
+}
+
+.weather-city {
+    font-size: 11px;
+    color: #666666; /* 城市文字灰色 */
+}
+
+.weather-desc {
+    font-size: 10px;
+    color: #888888; /* 天气描述浅灰色 */
+}
+
+.weather-loading {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    color: #757575;
+}
+
+/* 用户信息区域 */
+.user-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-shrink: 0;
+}
+
+.user-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-weight: 600;
+}
+
+.user-details {
+    display: flex;
+    flex-direction: column;
+}
+
+.user-name {
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.user-role {
+    font-size: 12px;
+    color: var(--text-secondary);
+    background: #f1f5f9;
+    padding: 2px 8px;
+    border-radius: 999px;
+    margin-top: 4px;
+    width: fit-content;
+}
+
+.logout-btn {
+    color: #ef4444;
+    cursor: pointer;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+/* 主内容区域 */
+.main-content {
+    position: fixed;
+    top: var(--topbar-height);
+    left: var(--sidebar-width);
+    right: 0;
+    bottom: 0;
+    background: var(--bg);
+    transition: left 0.3s ease;
+}
+
+.main-content.collapsed {
+    left: var(--sidebar-collapsed-width);
+}
+
+#mainFrame {
+    width: 100%;
+    height: 100%;
+    border: none;
+    background: var(--bg);
+    transition: opacity 0.2s ease;
+}
+
+/* 加载指示器 */
+.loading {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 12px;
+    background: rgba(245, 247, 251, 0.8);
+    z-index: 1000;
+}
+
+.loading-spinner {
+    border: 3px solid #e5e7eb;
+    border-top: 3px solid var(--primary);
+    border-radius: 50%;
+    width: 32px;
+    height: 32px;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* 移动端菜单按钮 */
+.mobile-menu-toggle {
+    display: none;
+    position: fixed;
+    top: 16px;
+    left: 16px;
+    width: 44px;
+    height: 44px;
+    border-radius: 14px;
+    border: none;
+    background: var(--primary);
+    color: #fff;
+    box-shadow: var(--shadow);
+    z-index: 1300;
+    cursor: pointer;
+}
+
+/* 遮罩层 */
+.overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.45);
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.2s ease;
+    z-index: 1100;
+}
+
+.overlay.show {
+    opacity: 1;
+    visibility: visible;
+}
+
+/* 滚动条样式优化 */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #a8a8a8;
+}
+
+/* 侧边栏滚动条 */
+.left-sidebar ::-webkit-scrollbar {
+    width: 4px;
+}
+
+.left-sidebar ::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.left-sidebar ::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+.left-sidebar ::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.5);
+}
+
+/* 响应式设计 */
+@media (max-width: 1200px) {
+    :root {
+        --sidebar-width: 230px;
+    }
+}
+
+@media (max-width: 992px) {
+    :root {
+        --sidebar-width: 210px;
+        --topbar-height: 60px;
+    }
+
+    .user-details {
+        display: none;
+    }
+
+    .breadcrumb {
+        max-width: 50vw;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+}
+
+@media (max-width: 768px) {
+    .left-sidebar {
+        transform: translateX(-100%);
+    }
+
+    .top-navbar {
+        left: 0;
+    }
+
+    .main-content {
+        left: 0;
+    }
+
+    .mobile-menu-toggle {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .weather-widget {
+        min-width: 100px;
+        max-width: 130px;
+        padding: 6px 8px;
+        margin-right: 10px;
+    }
+
+    .weather-details {
+        display: none;
+    }
+}
+
+.top-navbar.collapsed .weather-details {
+    display: none;
+}

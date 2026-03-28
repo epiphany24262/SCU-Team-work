@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns:v-slot="http://www.w3.org/1999/XSL/Transform">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>角色权限 - 智慧交通管理系统</title>
+    <link rel="stylesheet" href="css/lib/index.min.css">
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            background: #f5f6fa;
+            font-family: "Microsoft YaHei", sans-serif;
+        }
+        .search-card {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .table-card {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+        }
+        .role-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 16px;
+        }
+        .role-card {
+            border: 1px solid #e6e6e6;
+            border-radius: 8px;
+            padding: 16px;
+            background: #fafcff;
+        }
+        .role-card h4 {
+            margin: 0 0 8px 0;
+            color: #2a5298;
+        }
+        .role-card p {
+            margin: 4px 0;
+            color: #666;
+            font-size: 13px;
+        }
+        .el-table {
+            --el-table-header-text-color: #333;
+            --el-table-row-hover-bg-color: #f8f9fa;
+        }
+        .tree-container {
+            max-height: 400px;
+            overflow-y: auto;
+            padding: 10px;
+            border: 1px solid #e6e6e6;
+            border-radius: 4px;
+            margin: 10px 0 20px;
+        }
+        .role-tag {
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+        .role-manager {
+            background: #e8f4f8;
+            color: #4299e1;
+        }
+        .role-user {
+            background: #f0f8fb;
+            color: #38b2ac;
+        }
+        .el-dialog {
+            z-index: 3000 !important;
+        }
+        .el-dialog__modal {
+            z-index: 2999 !important;
+        }
+    </style>
+</head>
+<body>
+<div id="app">
+    <!-- 角色展示卡片 -->
+    <div class="table-card">
+        <div style="margin-bottom: 12px; color: #666;">
+            共 <span style="color: #1989fa; font-weight: bold;">{{ total }}</span> 个角色
+        </div>
+        <div class="role-grid" v-loading="loading">
+            <div class="role-card" v-for="role in roleList" :key="role.id">
+                <h4>{{ role.roleName }}</h4>
+                <p>标识：{{ role.roleCode }}</p>
+                <p>描述：{{ role.description || '暂无描述' }}</p>
+                <p>
+                    类型：
+                    <span class="role-tag" :class="isManagerRole(role.roleCode) ? 'role-manager' : 'role-user'">
+                        {{ isManagerRole(role.roleCode) ? '管理员' : '普通用户' }}
+                    </span>
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="js/lib/vue.min.js"></script>
+<script src="js/lib/index.min.js"></script>
+<script>
+    new Vue({
+        el: '#app',
+        data() {
+            return {
+                roleList: [],
+                loading: false,
+                currentPage: 1,
+                pageSize: 10,
+                total: 0,
+                selectedRoles: []
+            }
+        },
+        mounted() {
+            this.getRoleList();
+        },
+        methods: {
+            // 获取角色列表
+            getRoleList() {
+                this.loading = true;
+                const params = new URLSearchParams({
+                    roleName: '',
+                    roleCode: '',
+                    page: this.currentPage,
+                    pageSize: this.pageSize
+                });
+                fetch(`/api/roles?${params.toString()}`)
+                    .then(res => res.json())
+                    .then(res => {
+                        if (res.success && res.data) {
+                            this.roleList = Array.isArray(res.data.list) ? res.data.list : [];
+                            this.total = res.data.total || 0;
+                        } else {
+                            this.$message.error(res.message || '获取角色列表失败');
+                        }
+                    })
+                    .catch(() => this.$message.error('获取角色列表异常'))
+                    .finally(() => { this.loading = false; });
+            },
+            isManagerRole(roleCode) {
+                if (!roleCode) return false;
+                return roleCode === 'SUPER_ADMIN' || roleCode === 'ADMIN';
+            }
+        }
+    });
+</script>
+</body>
+</html>

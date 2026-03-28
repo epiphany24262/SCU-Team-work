@@ -1,0 +1,522 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>数据总览</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="css/home.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+<div class="overview-page">
+    <header class="hero">
+        <div>
+            <h1 class="hero-title">数据总览</h1>
+            <div class="hero-subtitle">智慧交通运行态势与实时监控概览</div>
+            <div class="hero-meta">
+                <span class="pill"><i class="fa-solid fa-wave-square"></i> 实时监测</span>
+                <span class="pill ghost"><i class="fa-solid fa-shield"></i> 今日运行稳定</span>
+                <span class="pill ghost"><i class="fa-solid fa-location-dot"></i> 成都市</span>
+            </div>
+        </div>
+        <div class="hero-actions">
+            <div class="fullscreen-container">
+                <button class="fullscreen-btn" id="fullscreenToggle" aria-label="全屏显示" type="button">
+                    <i class="fas fa-expand" id="fullscreenIcon"></i>
+                    <span class="fullscreen-text" id="fullscreenText">全屏</span>
+                </button>
+            </div>
+                <div class="download-container">
+                    <a class="pill" style="text-decoration:none" href="Download/SmartTraffic-release.zip" download>
+                        <i class="fa-solid fa-cloud-arrow-down"></i> 下载发布包
+                    </a>
+                </div>
+            <div class="message-center" id="messageCenter">
+                <button class="message-bell" id="messageToggle" aria-label="消息中心" aria-haspopup="dialog" aria-expanded="false" type="button">
+                    <i class="fas fa-envelope"></i>
+                    <div class="message-badge" id="messageBadge">3</div>
+                </button>
+                <div class="message-dropdown" id="messageDropdown" role="dialog" aria-hidden="true">
+                    <div class="message-header">
+                        <h3>消息中心</h3>
+                        <div class="message-actions">
+                            <span id="unreadCount">3条未读</span>
+                            <button class="message-clear" id="markAllRead" type="button">全部已读</button>
+                        </div>
+                    </div>
+                    <div class="message-list" id="messageList">
+                        <div class="message-empty">正在加载消息...</div>
+                    </div>
+                    <div class="message-footer">
+                        <a href="javascript:void(0)" class="view-all" id="viewAllMessages">查看全部消息</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <section class="kpi-grid">
+        <div class="kpi-card">
+            <div class="kpi-info">
+                <h3>车辆总数（辆）</h3>
+                <p>12,356</p>
+            </div>
+            <div class="kpi-icon"><i class="fa-solid fa-car"></i></div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-info">
+                <h3>车辆使用数（辆）</h3>
+                <p>9,842</p>
+            </div>
+            <div class="kpi-icon"><i class="fa-solid fa-road"></i></div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-info">
+                <h3>行驶里程总数（km）</h3>
+                <p>1,235,600</p>
+            </div>
+            <div class="kpi-icon"><i class="fa-solid fa-location-dot"></i></div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-info">
+                <h3>行驶时长总数（h）</h3>
+                <p>52,860</p>
+            </div>
+            <div class="kpi-icon"><i class="fa-solid fa-clock"></i></div>
+        </div>
+    </section>
+
+    <!-- 核心布局：左1/中2/右1 -->
+    <section class="grid-layout">
+        <!-- 左侧列：2个图表 -->
+        <div class="grid-col grid-col-1">
+            <div class="panel">
+                <div class="panel-title">车辆类型统计 <span>分类占比</span></div>
+                <div class="panel-body">
+                    <div id="char1" class="chart-holder"></div>
+                </div>
+            </div>
+            <div class="panel">
+                <div class="panel-title">车辆行驶统计 <span>趋势变化</span></div>
+                <div class="panel-body">
+                    <div id="char3" class="chart-holder"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 中间列：地图（两倍宽） -->
+        <div class="grid-col grid-col-2">
+            <div class="panel map-panel">
+                <div class="panel-title">车辆行驶地图 <span>实时分布</span></div>
+                <div class="panel-body">
+                    <div id="map_box"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 右侧列：2个图表 -->
+        <div class="grid-col grid-col-3">
+            <div class="panel">
+                <div class="panel-title">车辆状态统计 <span>运行状态</span></div>
+                <div class="panel-body">
+                    <div id="char2" class="chart-holder"></div>
+                </div>
+            </div>
+            <div class="panel">
+                <div class="panel-title">车辆报警统计 <span>告警分布</span></div>
+                <div class="panel-body">
+                    <div id="char4" class="chart-holder"></div>
+                </div>
+            </div>
+        </div>
+    </section>
+</div>
+
+<!-- 全屏提示元素 -->
+<div class="fullscreen-hint" id="fullscreenHint">
+    <i class="fas fa-info-circle"></i> 按 <kbd>Esc</kbd> 键或点击恢复按钮退出全屏
+</div>
+
+<!-- 引入第三方脚本 -->
+<script src="js/jquery/jQuery-2.2.0.min.js"></script>
+<script src="js/echarts-all.js"></script>
+<script src="js/base.js"></script>
+<script src="js/home.js"></script>
+<script src="js/map.js"></script>
+<script type="text/javascript" src="http://api.map.baidu.com/api?v=2.0&ak=PI3VfWo5wYHDlj0fziHeQiKL4jMT1DEw"></script>
+
+<script>
+    // 地图初始化
+    function initMap() {
+        this.map = new BMap.Map("map_box");
+        this.map.centerAndZoom(new BMap.Point(104.088520, 30.632894), 16);
+        this.map.enableScrollWheelZoom(true);
+
+        const marker = new BMap.Marker(new BMap.Point(104.088520, 30.632894));
+        this.map.addOverlay(marker);
+
+        const infoWindow = new BMap.InfoWindow("智慧交通监控中心");
+        marker.addEventListener("click", function() {
+            this.openInfoWindow(infoWindow);
+        });
+
+        this.map.addControl(new BMap.NavigationControl());
+        this.map.addControl(new BMap.ScaleControl());
+    }
+
+    window.addEventListener('load', function() {
+        initMap();
+    });
+
+    // 消息中心逻辑
+    document.addEventListener('DOMContentLoaded', function() {
+        const messageCenter = document.getElementById('messageCenter');
+        const messageDropdown = document.getElementById('messageDropdown');
+        const messageToggle = document.getElementById('messageToggle');
+        const messageList = document.getElementById('messageList');
+        const messageBadge = document.getElementById('messageBadge');
+        const unreadCount = document.getElementById('unreadCount');
+        const markAllRead = document.getElementById('markAllRead');
+        const viewAllMessages = document.getElementById('viewAllMessages');
+
+        const previewLimit = 5;
+        let previewMessages = [];
+        let currentUser = null;
+        let readState = new Set();
+
+        function getLocalUser() {
+            const userData = localStorage.getItem('traffic_user');
+            if (!userData) return null;
+            try {
+                return JSON.parse(userData);
+            } catch (e) {
+                return null;
+            }
+        }
+
+        function getReadStorageKey() {
+            return currentUser ? `message_read_${currentUser.username}` : 'message_read_anonymous';
+        }
+
+        function loadReadState() {
+            const raw = localStorage.getItem(getReadStorageKey());
+            if (!raw) return new Set();
+            try {
+                const ids = JSON.parse(raw);
+                return new Set(Array.isArray(ids) ? ids : []);
+            } catch (e) {
+                return new Set();
+            }
+        }
+
+        function saveReadState() {
+            localStorage.setItem(getReadStorageKey(), JSON.stringify(Array.from(readState)));
+        }
+
+        function parseTimeString(timeStr) {
+            if (!timeStr) return null;
+            const normalized = timeStr.replace('T', ' ').replace(/\//g, '-');
+            const date = new Date(normalized.includes(' ') ? normalized.replace(' ', 'T') : normalized);
+            return isNaN(date.getTime()) ? null : date;
+        }
+
+        function formatRelativeTime(timeStr) {
+            const date = parseTimeString(timeStr);
+            if (!date) return timeStr || '未知时间';
+            const diff = Date.now() - date.getTime();
+            const minute = 60 * 1000;
+            const hour = 60 * minute;
+            const day = 24 * hour;
+            if (diff < minute) return '刚刚';
+            if (diff < hour) return `${Math.floor(diff / minute)}分钟前`;
+            if (diff < day) return `${Math.floor(diff / hour)}小时前`;
+            if (diff < 7 * day) return `${Math.floor(diff / day)}天前`;
+            return timeStr;
+        }
+
+        function getIconBySource(type, source) {
+            if (source === 'system_log') return 'clipboard-list';
+            if (source === 'violation') return 'car-burst';
+            if (type === 'alert') return 'exclamation-triangle';
+            if (type === 'warning') return 'triangle-exclamation';
+            if (type === 'success') return 'check-circle';
+            return 'info-circle';
+        }
+
+        function normalizePreviewItem(raw) {
+            const id = raw.id || raw.messageId || raw.msgId || raw.logId || raw.violationId || '';
+            const time = raw.time || raw.createdAt || raw.created_at || raw.operateTime || raw.operate_time || '';
+            const type = raw.type || (raw.source === 'system_log' ? 'system' : raw.source === 'violation' ? 'alert' : 'info');
+            const source = raw.source || 'message';
+            const text = raw.content || raw.text || '';
+
+            return {
+                id: String(id),
+                title: raw.title || '系统通知',
+                text,
+                time,
+                displayTime: formatRelativeTime(time),
+                type,
+                source,
+                unread: !readState.has(String(id)),
+                icon: raw.icon || getIconBySource(type, source)
+            };
+        }
+
+        async function fetchPreview() {
+            if (!currentUser) return [];
+            const params = new URLSearchParams({
+                username: currentUser.username,
+                role: currentUser.role || 'user',
+                limit: String(previewLimit)
+            });
+            const response = await fetch(`/api/message-center/feed?${params.toString()}`);
+            if (!response.ok) {
+                return [];
+            }
+            const result = await response.json();
+            if (result && result.success && result.data && Array.isArray(result.data.list)) {
+                return result.data.list;
+            }
+            return [];
+        }
+
+        function renderPreview() {
+            if (!previewMessages.length) {
+                messageList.innerHTML = '<div class="message-empty">暂无消息</div>';
+                updateUnreadCount();
+                return;
+            }
+            messageList.innerHTML = previewMessages.map(item => `
+                <div class="message-item ${item.unread ? 'unread' : ''}" data-id="${item.id}" role="button" tabindex="0">
+                    <div class="message-icon"><i class="fas fa-${item.icon}"></i></div>
+                    <div class="message-content">
+                        <div class="message-title">${item.title}</div>
+                        <div class="message-text">${item.text}</div>
+                        <div class="message-time">${item.displayTime || item.time}</div>
+                    </div>
+                </div>
+            `).join('');
+
+            messageList.querySelectorAll('.message-item').forEach(item => {
+                item.addEventListener('click', () => {
+                    const msgId = item.getAttribute('data-id');
+                    const target = previewMessages.find(m => String(m.id) === String(msgId));
+                    if (target && target.unread) {
+                        target.unread = false;
+                        readState.add(String(target.id));
+                        saveReadState();
+                        item.classList.remove('unread');
+                        updateUnreadCount();
+                    }
+                });
+            });
+        }
+
+        async function loadPreview() {
+            const list = await fetchPreview();
+            previewMessages = list.map(item => normalizePreviewItem(item));
+            renderPreview();
+        }
+
+        function updateUnreadCount() {
+            const unreadItems = messageList.querySelectorAll('.message-item.unread').length;
+            if (unreadItems > 0) {
+                messageBadge.textContent = unreadItems;
+                messageBadge.style.display = 'flex';
+                unreadCount.textContent = unreadItems + '条未读';
+            } else {
+                messageBadge.style.display = 'none';
+                unreadCount.textContent = '暂无未读消息';
+            }
+        }
+
+        function openDropdown() {
+            messageDropdown.style.display = 'block';
+            messageDropdown.setAttribute('aria-hidden', 'false');
+            messageToggle.setAttribute('aria-expanded', 'true');
+            loadPreview();
+        }
+
+        function closeDropdown() {
+            messageDropdown.style.display = 'none';
+            messageDropdown.setAttribute('aria-hidden', 'true');
+            messageToggle.setAttribute('aria-expanded', 'false');
+        }
+
+        function toggleDropdown() {
+            if (messageDropdown.style.display === 'block') {
+                closeDropdown();
+            } else {
+                openDropdown();
+            }
+        }
+
+        messageToggle.addEventListener('click', function(e) {
+            e.stopPropagation();
+            toggleDropdown();
+        });
+
+        markAllRead.addEventListener('click', function(e) {
+            e.stopPropagation();
+            previewMessages.forEach(msg => {
+                msg.unread = false;
+                readState.add(String(msg.id));
+            });
+            saveReadState();
+            messageList.querySelectorAll('.message-item.unread').forEach(function(item) {
+                item.classList.remove('unread');
+            });
+            updateUnreadCount();
+        });
+
+        messageList.addEventListener('click', function(e) {
+            const item = e.target.closest('.message-item');
+            if (!item) {
+                return;
+            }
+            const msgId = item.getAttribute('data-id');
+            const target = previewMessages.find(m => String(m.id) === String(msgId));
+            if (target && target.unread) {
+                target.unread = false;
+                readState.add(String(target.id));
+                saveReadState();
+            }
+            item.classList.remove('unread');
+            updateUnreadCount();
+        });
+
+        messageList.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' || e.key === ' ') {
+                const item = e.target.closest('.message-item');
+                if (item) {
+                    e.preventDefault();
+                    const msgId = item.getAttribute('data-id');
+                    const target = previewMessages.find(m => String(m.id) === String(msgId));
+                    if (target && target.unread) {
+                        target.unread = false;
+                        readState.add(String(target.id));
+                        saveReadState();
+                    }
+                    item.classList.remove('unread');
+                    updateUnreadCount();
+                }
+            }
+        });
+
+        document.addEventListener('click', function(e) {
+            if (!messageCenter.contains(e.target)) {
+                closeDropdown();
+            }
+        });
+
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                closeDropdown();
+            }
+        });
+
+        viewAllMessages?.addEventListener('click', function() {
+            if (window.parent && typeof window.parent.loadPage === 'function') {
+                window.parent.loadPage('message.html', '消息中心');
+            } else {
+                window.location.href = 'message.html';
+            }
+        });
+
+        currentUser = getLocalUser();
+        readState = loadReadState();
+        loadPreview();
+        updateUnreadCount();
+
+        // 全屏功能
+        const fullscreenToggle = document.getElementById('fullscreenToggle');
+        const fullscreenIcon = document.getElementById('fullscreenIcon');
+        const fullscreenText = document.getElementById('fullscreenText');
+        const fullscreenHint = document.getElementById('fullscreenHint');
+
+        const fullscreenEnabled = document.fullscreenEnabled ||
+            document.webkitFullscreenEnabled ||
+            document.mozFullScreenEnabled;
+
+        if (!fullscreenEnabled) {
+            fullscreenToggle.style.display = 'none';
+            return;
+        }
+
+        const fullscreenElement = document.documentElement;
+
+        function isFullscreen() {
+            return document.fullscreenElement ||
+                document.webkitFullscreenElement ||
+                document.mozFullScreenElement;
+        }
+
+        function enterFullscreen() {
+            if (fullscreenElement.requestFullscreen) {
+                fullscreenElement.requestFullscreen();
+            } else if (fullscreenElement.webkitRequestFullscreen) {
+                fullscreenElement.webkitRequestFullscreen();
+            } else if (fullscreenElement.mozRequestFullScreen) {
+                fullscreenElement.mozRequestFullScreen();
+            }
+        }
+
+        function exitFullscreen() {
+            if (document.exitFullscreen) {
+                document.exitFullscreen();
+            } else if (document.webkitExitFullscreen) {
+                document.webkitExitFullscreen();
+            } else if (document.mozCancelFullScreen) {
+                document.mozCancelFullScreen();
+            }
+        }
+
+        function toggleFullscreen() {
+            if (isFullscreen()) {
+                exitFullscreen();
+            } else {
+                enterFullscreen();
+            }
+        }
+
+        function updateFullscreenButton() {
+            if (isFullscreen()) {
+                fullscreenToggle.classList.add('fullscreen-active');
+                fullscreenIcon.className = 'fas fa-compress';
+                fullscreenText.textContent = '恢复';
+            } else {
+                fullscreenToggle.classList.remove('fullscreen-active');
+                fullscreenIcon.className = 'fas fa-expand';
+                fullscreenText.textContent = '全屏';
+            }
+        }
+
+        function showFullscreenHint() {
+            fullscreenHint.classList.add('show');
+            setTimeout(() => {
+                fullscreenHint.classList.remove('show');
+            }, 3000);
+        }
+
+        fullscreenToggle.addEventListener('click', toggleFullscreen);
+        document.addEventListener('fullscreenchange', updateFullscreenButton);
+        document.addEventListener('webkitfullscreenchange', updateFullscreenButton);
+        document.addEventListener('mozfullscreenchange', updateFullscreenButton);
+
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'F11') {
+                e.preventDefault();
+                toggleFullscreen();
+                showFullscreenHint();
+            }
+            if (e.key === 'Escape' && isFullscreen()) {
+                exitFullscreen();
+            }
+        });
+
+        updateFullscreenButton();
+    });
+</script>
+</body>
+</html>

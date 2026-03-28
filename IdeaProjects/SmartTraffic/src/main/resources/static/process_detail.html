@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>处理详情</title>
+    <link rel="stylesheet" href="css/lib/index.min.css">
+    <link rel="stylesheet" href="css/process_detail.css">
+</head>
+<body>
+<div id="app">
+    <div class="detail-container">
+        <!-- 头部 -->
+        <div class="header-section">
+            <div class="header-title">
+                <i class="el-icon-video-camera"></i>
+                处理详情
+                <span style="font-size: 14px; color: #666; margin-left: 10px;">{{ originalFilename }}</span>
+            </div>
+
+            <div class="header-controls">
+                <el-button @click="recognizeAllPlates" type="primary" :loading="recognizeLoading">
+                    <i class="el-icon-search"></i> 车牌识别
+                </el-button>
+                <el-button @click="saveData" type="success" :loading="saveLoading">
+                    <i class="el-icon-document-checked"></i> 保存数据
+                </el-button>
+                <el-button @click="goBack" type="default">
+                    <i class="el-icon-back"></i> 返回列表
+                </el-button>
+            </div>
+        </div>
+
+        <!-- 主要内容区域 -->
+        <div class="main-layout">
+            <!-- 左侧：处理后的视频 -->
+            <div class="video-section">
+                <el-card class="video-card">
+                    <div slot="header" class="video-header">
+                        <span>处理结果视频</span>
+                        <div class="video-controls">
+                            <el-button @click="togglePlay" size="small">
+                                {{ isPlaying ? '暂停' : '播放' }}
+                            </el-button>
+                            <el-button @click="downloadVideo" size="small">
+                                <i class="el-icon-download"></i> 下载视频
+                            </el-button>
+                        </div>
+                    </div>
+                    <div class="video-player">
+                        <video
+                                v-if="processedVideoUrl"
+                                ref="videoPlayer"
+                                :src="processedVideoUrl"
+                                controls
+                                @loadedmetadata="onVideoLoad"
+                                @play="isPlaying = true"
+                                @pause="isPlaying = false">
+                        </video>
+                        <div v-else class="no-video">
+                            <i class="el-icon-video-camera"></i>
+                            <p>暂无处理后的视频</p>
+                            <div class="hint">请先在监控页面处理视频</div>
+                            <el-button
+                                    type="primary"
+                                    size="small"
+                                    style="margin-top: 20px;"
+                                    @click="goToProcessPage">
+                                去处理视频
+                            </el-button>
+                        </div>
+                    </div>
+                </el-card>
+            </div>
+
+            <!-- 右侧：抓拍图片列表 -->
+            <div class="capture-section">
+                <el-card class="capture-card">
+                    <div slot="header" class="capture-header">
+                        <span>抓拍图片 ({{ selectedCaptures.length }}/{{ captureList.length }} 已选择)</span>
+                        <div>
+                            <el-button
+                                    @click="selectAllCaptures"
+                                    size="mini"
+                                    :type="allSelected ? 'primary' : 'default'">
+                                {{ allSelected ? '取消全选' : '全选' }}
+                            </el-button>
+                            <el-button
+                                    @click="deleteSelectedCaptures"
+                                    type="danger"
+                                    size="mini"
+                                    :disabled="selectedCaptures.length === 0">
+                                <i class="el-icon-delete"></i> 删除选中
+                            </el-button>
+                        </div>
+                    </div>
+
+                    <div class="capture-list">
+                        <div v-if="captureList.length === 0" class="empty-captures">
+                            <i class="el-icon-picture-outline"></i>
+                            <p>暂无抓拍图片</p>
+                        </div>
+
+                        <div
+                                v-for="capture in captureList"
+                                :key="capture.id"
+                                class="capture-item"
+                                :class="{ 'selected': capture.selected }">
+                            <el-checkbox
+                                    v-model="capture.selected"
+                                    class="capture-checkbox"
+                                    @change="handleCheckboxChange(capture)"
+                                    @click="toggleCaptureSelect(capture)">
+                            </el-checkbox>
+                            <img :src="capture.url" :alt="capture.filename" @error="onImageError" @click.stop="previewCaptureImage(capture)">
+                            <div class="capture-info">
+                                <div class="capture-time">{{ capture.timestamp }}</div>
+                                <div class="capture-id">ID: {{ capture.vehicleId }}</div>
+                                <div v-if="capture.plateNumber" class="capture-plate" style="color: #409EFF;">
+                                    车牌: {{ capture.plateNumber }}
+                                </div>
+                                <div v-if="capture.plateColor" class="capture-plate" style="color: #E6A23C;">
+                                    车牌颜色: {{ capture.plateColor }}
+                                </div>
+                                <div v-if="capture.vehicleType" class="capture-plate" style="color: #67C23A;">
+                                    车辆类型: {{ capture.vehicleType }}
+                                </div>
+                                <div v-if="capture.confidence" class="capture-plate" :style="{ color: getConfidenceColor(capture.confidence) }">
+                                    置信度: {{ capture.confidence.toFixed(1) }}%
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </el-card>
+            </div>
+        </div>
+
+        <!-- 处理信息 -->
+        <div class="info-section">
+            <h3 style="margin-bottom: 15px; color: #333;">处理信息</h3>
+            <div class="info-grid">
+                <div class="info-item">
+                    <div class="info-label">处理类型</div>
+                    <div class="info-value">{{ processInfo.type }}</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">抓拍数量</div>
+                    <div class="info-value">{{ captureList.length }} 张</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">违规数量</div>
+                    <div class="info-value">{{ processInfo.violationCount }} 辆</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">视频时长</div>
+                    <div class="info-value">{{ processInfo.videoDuration }}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+</body>
+<script src="js/lib/vue.min.js"></script>
+<script src="js/lib/index.min.js"></script>
+<script src="js/lib/axios.min.js"></script>
+<script>
+    new Vue({
+        el: '#app',
+        data() {
+            return {
+                // URL参数
+                jobId: '',
+                violationType: '',
+
+                // 视频相关
+                processedVideoUrl: '',
+                originalFilename: '',
+                isPlaying: false,
+
+                // 抓拍图片
+                captureList: [],
+                selectedCaptures: [],
+
+                // 处理信息
+                processInfo: {
+                    type: '逆行检测',
+                    violationCount: 0,
+                    videoDuration: ''
+                },
+
+                // 车牌识别
+                plateResults: [],
+                recognizeLoading: false,
+
+                // 保存
+                saveLoading: false
+            }
+        },
+        computed: {
+            allSelected() {
+                return this.captureList.length > 0 &&
+                    this.captureList.every(item => item.selected);
+            }
+        },
+        mounted() {
+            this.initFromUrlParams();
+            this.loadCaptures();
+        },
+        methods: {
+            // 从URL参数初始化
+            initFromUrlParams() {
+                const urlParams = new URLSearchParams(window.location.search);
+                this.jobId = urlParams.get('job_id') || '';
+                this.violationType = urlParams.get('type') || 'wrong_way';
+                this.processedVideoUrl = urlParams.get('video_url') || '';
+                this.originalFilename = urlParams.get('filename') || '未命名视频';
+                const typeMap = {
+                    wrong_way: '逆行检测',
+                    line_press: '压线检测',
+                    illegal_parking: '违停检测',
+                    red_light: '红绿灯检测',
+                    helmet: '头盔检测'
+                };
+                this.processInfo.type = typeMap[this.violationType] || '违规检测';
+            },
+
+            goToProcessPage() {
+                window.location.href = 'carControl.html';
+            },
+
+            async loadCaptures() {
+                try {
+                    // 使用我们后端写好的接口
+                    const response = await axios.get('/api/process/captures/all', {
+                        params: { type: this.violationType }
+                    });
+                    if (response.data && response.data.success) {
+                        this.captureList = response.data.data.map(capture => ({
+                            ...capture,
+                            selected: false
+                        }));
+                        // 更新数量
+                        this.processInfo.violationCount = this.captureList.length;
+                        console.log('加载了', this.captureList.length, '张抓拍图片');
+                    } else {
+                        console.error('获取抓拍失败:', response.data.message);
+                    }
+                } catch (error) {
+                    console.error('加载抓拍图片失败:', error);
+                }
+            },
+
+            // 播放控制
+            togglePlay() {
+                const video = this.$refs.videoPlayer;
+                if (video) {
+                    if (this.isPlaying) {
+                        video.pause();
+                    } else {
+                        video.play().catch(error => {
+                            this.$message.error('视频播放失败: ' + error.message);
+                        });
+                    }
+                }
+            },
+
+            // 下载视频
+            downloadVideo() {
+                if (this.processedVideoUrl) {
+                    const link = document.createElement('a');
+                    link.href = this.processedVideoUrl;
+                    link.download = `processed_${this.originalFilename}`;
+                    link.click();
+                } else {
+                    this.$message.warning('视频地址无效');
+                }
+            },
+
+            // 选择/取消选择抓拍图片
+            toggleCaptureSelect(capture) {
+                capture.selected = !capture.selected;
+                this.updateSelectedCaptures();
+            },
+            previewCaptureImage(capture) {
+                this.$alert(`<img src="${capture.url}" style="max-width: 100%; max-height: 80vh;">`, '查看大图', {
+                    dangerouslyUseHTMLString: true,
+                    customClass: 'image-preview-dialog',
+                    showConfirmButton: false,
+                    closeOnClickModal: true
+                });
+            },
+            handleCheckboxChange(capture) {
+                this.updateSelectedCaptures();
+            },
+
+            updateSelectedCaptures() {
+                this.selectedCaptures = this.captureList.filter(item => item.selected);
+            },
+
+            // 全选/取消全选
+            selectAllCaptures() {
+                const allSelected = this.allSelected;
+                this.captureList.forEach(item => {
+                    item.selected = !allSelected;
+                });
+                this.updateSelectedCaptures();
+            },
+
+            // 删除选中的抓拍图片
+            async deleteSelectedCaptures() {
+                if (this.selectedCaptures.length === 0) {
+                    this.$message.warning('请先选择要删除的图片');
+                    return;
+                }
+
+                try {
+                    await this.$confirm(`确定删除选中的 ${this.selectedCaptures.length} 张图片吗？`, '提示', {
+                        confirmButtonText: '确定',
+                        cancelButtonText: '取消',
+                        type: 'warning'
+                    });
+
+                    // 收集要删除的文件名
+                    const filenames = this.selectedCaptures.map(item => item.filename);
+
+                    // 调用删除接口（使用我们写的Spring Boot接口）
+                    const response = await axios.post('/api/process/captures/batch-delete', filenames);
+
+                    if (response.data && response.data.success) {
+                        this.$message.success(response.data.message || '删除成功');
+
+                        // 从列表中移除已删除的项
+                        this.captureList = this.captureList.filter(item =>
+                            !filenames.includes(item.filename)
+                        );
+
+                        // 清空选中
+                        this.selectedCaptures = [];
+
+                        // 更新数量
+                        this.processInfo.violationCount = this.captureList.length;
+
+                    } else {
+                        this.$message.error(response.data?.message || '删除失败');
+                    }
+
+                } catch (error) {
+                    if (error !== 'cancel') {
+                        this.$message.error('删除失败: ' + error.message);
+                    }
+                }
+            },
+
+            // 新增：图片转Base64方法
+            imageToBase64(url) {
+                return new Promise((resolve) => {
+                    const img = new Image();
+                    img.crossOrigin = 'anonymous';
+                    img.onload = function() {
+                        const canvas = document.createElement('canvas');
+                        canvas.width = img.width;
+                        canvas.height = img.height;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0);
+                        const base64 = canvas.toDataURL('image/jpeg', 0.8);
+                        resolve(base64.split(',')[1]); // 纯Base64数据
+                    };
+                    img.onerror = () => resolve(null);
+                    img.src = url;
+                });
+            },
+
+            // 车牌识别（批量识别选中的图片）
+            async recognizeAllPlates() {
+
+                if (this.selectedCaptures.length === 0) {
+                    await this.$confirm('未选择图片，是否识别所有图片？', '提示', {
+                        confirmButtonText: '识别全部',
+                        cancelButtonText: '取消'
+                    });
+                    this.selectAllCaptures();
+                    if (this.selectedCaptures.length === 0) {
+                        return;
+                    }
+                }
+
+                this.recognizeLoading = true;
+                this.plateResults = [];
+
+                try {
+                    // 转为Base64
+                    const base64Images = [];
+                    for (const item of this.selectedCaptures) {
+                        const base64 = await this.imageToBase64(item.url);
+                        if (base64) base64Images.push(base64);
+                    }
+
+                    if (base64Images.length === 0) {
+                        this.$message.error('图片转换Base64失败');
+                        return;
+                    }
+                    const vehicleIds = this.selectedCaptures.map(item => item.vehicleId);
+                    const response = await axios.post('/api/process/recognize_plates', {
+                        job_id: this.jobId,
+                        image_urls: base64Images, // 传Base64
+                        image_type: 'base64',
+                        vehicle_ids: vehicleIds
+                    });
+
+                    if (response.data.success) {
+                        this.plateResults = response.data.results;
+                        // 更新抓拍列表中的车牌信息
+                        this.plateResults.forEach(result => {
+                            const capture = this.captureList.find(c => c.vehicleId === result.vehicleId);
+                            if (capture) {
+                                capture.plateNumber = result.plateNumber;
+                                capture.plateColor = result.plateColor;
+                                capture.vehicleType = result.vehicleType;
+                                capture.confidence = result.confidence;
+                            }
+                        });
+
+                        this.$message.success(`成功识别 ${this.plateResults.length} 个车牌`);
+                    } else {
+                        this.$message.error('车牌识别失败: ' + response.data.message);
+                    }
+                } catch (error) {
+                    this.$message.error('车牌识别失败: ' + error.message);
+                } finally {
+                    this.recognizeLoading = false;
+                }
+            },
+
+            // 保存单个车牌识别结果
+            async savePlateResult(result) {
+                try {
+                    const response = await axios.post('/api/save_plate_result', {
+                        job_id: this.jobId,
+                        capture_id: result.captureId || result.vehicleId, // 确保有capture_id
+                        plate_number: result.plateNumber,
+                        confidence: result.confidence
+                    });
+
+                    if (response.data.success) {
+                        this.$message.success('车牌信息已保存');
+                    }
+                } catch (error) {
+                    this.$message.error('保存失败: ' + error.message);
+                }
+            },
+
+            // 保存所有数据
+            async saveData() {
+                this.saveLoading = true;
+
+                try {
+                    // 先检查哪些图片有车牌信息
+                    const capturesWithPlate = this.captureList.filter(capture =>
+                        capture.plateNumber && capture.plateNumber.trim() !== ''
+                    );
+
+                    if (capturesWithPlate.length === 0) {
+                        await this.$confirm('当前没有车牌信息，是否先进行车牌识别？', '提示', {
+                            confirmButtonText: '先识别',
+                            cancelButtonText: '取消保存',
+                            type: 'warning'
+                        });
+                        await this.recognizeAllPlates();
+                        return;
+                    }
+
+                    // 检查是否有选中的图片，如果没有选中的但有车牌信息，就保存所有有车牌信息的
+                    const selectedWithPlate = this.selectedCaptures.filter(capture =>
+                        capture.plateNumber && capture.plateNumber.trim() !== ''
+                    );
+
+                    const savesToUse = selectedWithPlate.length > 0 ? selectedWithPlate : capturesWithPlate;
+
+                    // 收集图片Base64数据
+                    const capturesWithImages = [];
+                    for (const capture of savesToUse) {
+                        try {
+                            // 将图片转换为Base64
+                            const base64 = await this.imageToBase64(capture.url);
+                            if (base64) {
+                                capturesWithImages.push({
+                                    id: capture.id,
+                                    vehicleId: capture.vehicleId,
+                                    timestamp: capture.timestamp || new Date().toISOString(),
+                                    plateNumber: capture.plateNumber,
+                                    plateColor: capture.plateColor || '蓝色',
+                                    vehicleType: capture.vehicleType || '小型汽车',
+                                    confidence: capture.confidence || 0.0,
+                                    imageData: base64  // 添加图片Base64数据
+                                });
+                                console.log('成功获取图片Base64:', capture.filename);
+                            } else {
+                                console.warn('图片转换Base64失败:', capture.filename);
+                                this.$message.warning(`图片 ${capture.filename} 转换失败，将跳过`);
+                            }
+                        } catch (error) {
+                            console.error('处理图片失败:', error, capture);
+                            this.$message.warning(`图片 ${capture.filename} 处理失败，将跳过`);
+                        }
+                    }
+
+                    if (capturesWithImages.length === 0) {
+                        this.$message.error('无法获取任何图片数据，保存失败');
+                        return;
+                    }
+
+                    // 构建要保存的数据
+                    const saveData = {
+                        job_id: this.jobId || `job_${Date.now()}`,
+                        violation_type: this.violationType || 'wrong_way',
+                        original_filename: this.originalFilename || '未命名视频',
+                        processed_video_url: this.processedVideoUrl || '',
+                        process_info: this.processInfo,
+                        captures: capturesWithImages
+                    };
+
+                    console.log('准备保存的数据，包含图片数量:', capturesWithImages.length);
+                    console.log('第一个capture的数据结构:', capturesWithImages[0]);
+
+                    // 调用保存接口
+                    const response = await axios.post('/api/process/save-data', saveData);
+
+                    if (response.data.success) {
+                        // 显示保存的详细信息
+                        if (response.data.data) {
+                            const data = response.data.data;
+                            this.$message.success(
+                                `成功保存了 ${data.carCount} 个车牌信息`
+                            );
+                        }
+                    } else {
+                        this.$message.error('保存失败: ' + response.data.message);
+                    }
+                } catch (error) {
+                    console.error('保存出错:', error);
+                    if (error !== 'cancel') {
+                        this.$message.error('保存失败: ' + error.message);
+                    }
+                } finally {
+                    this.saveLoading = false;
+                }
+            },
+
+            // 返回列表
+            goBack() {
+                window.history.back();
+            },
+
+            // 视频加载完成
+            onVideoLoad() {
+                const video = this.$refs.videoPlayer;
+                if (video) {
+                    const duration = video.duration;
+                    const minutes = Math.floor(duration / 60);
+                    const seconds = Math.floor(duration % 60);
+                    this.processInfo.videoDuration = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+                }
+            },
+
+            // 图片加载错误处理
+            onImageError(event) {
+                event.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTYwIiBoZWlnaHQ9IjEyMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZWVlZWVlIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzk5OSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPklNRyBFUlJPUjwvdGV4dD48L3N2Zz4=';
+            },
+
+            getConfidenceColor(confidence) {
+                if (confidence >= 90) return '#67C23A'; // 绿色
+                if (confidence >= 70) return '#E6A23C'; // 黄色
+                if (confidence >= 50) return '#F56C6C'; // 红色
+                return '#909399'; // 灰色
+            }
+    }
+    });
+</script>
+</html>

@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>车道标注</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 16px; color: #222; }
+        .toolbar { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+        button { padding: 6px 10px; cursor: pointer; }
+        #canvas { border: 1px solid #ccc; max-width: 100%; }
+        .hint { font-size: 12px; color: #666; margin-top: 8px; }
+    </style>
+</head>
+<body>
+<h3>车道标注（点击 4 个点：左上 → 右上 → 右下 → 左下）</h3>
+<div class="toolbar">
+    <button id="loadBtn">加载最新画面</button>
+    <button id="clearBtn">清空点</button>
+    <button id="saveBtn">保存标注</button>
+    <button id="completeBtn">标注完成并识别</button>
+</div>
+<canvas id="canvas"></canvas>
+<video id="sourceVideo" style="display:none;"></video>
+<div class="hint">
+    建议选择无遮挡、车道线清晰的一帧。标注后会保存到服务器的 annotation_config.json。
+</div>
+
+<script>
+    const params = new URLSearchParams(window.location.search);
+    const pythonFromQuery = params.get('python');
+    const pythonApiBaseUrl = pythonFromQuery ? decodeURIComponent(pythonFromQuery) : 'http://localhost:8002';
+    const sourceUrl = params.get('source') ? decodeURIComponent(params.get('source')) : '';
+    const sourceType = params.get('type') || '';
+    const springApiBaseUrl = 'http://localhost:8081/api';
+    const springPageBaseUrl = springApiBaseUrl.replace(/\/?api\/?$/, '');
+    const returnFromQuery = params.get('return');
+    const returnUrl = returnFromQuery ? decodeURIComponent(returnFromQuery) : '';
+    const referrer = document.referrer || '';
+    const fallbackReturnUrl = referrer.includes('carControl.html') || referrer.includes('carContrl.html')
+        ? referrer
+        : `${springPageBaseUrl}/carControl.html`;
+    const finalReturnUrl = returnUrl || fallbackReturnUrl;
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    let img = new Image();
+    let points = [];
+
+    function draw() {
+        if (!img.src) return;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        points.forEach((p, i) => {
+            ctx.fillStyle = '#ff3b30';
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = '#ffffff';
+            ctx.font = '12px Arial';
+            ctx.fillText(String(i + 1), p.x + 6, p.y - 6);
+        });
+        if (points.length === 4) {
+            ctx.strokeStyle = '#00aaff';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(points[0].x, points[0].y);
+            for (let i = 1; i < 4; i++) {
+                ctx.lineTo(points[i].x, points[i].y);
+            }
+            ctx.closePath();
+            ctx.stroke();
+        }
+    }
+
+    async function loadFromApi() {
+        const res = await fetch(`${pythonApiBaseUrl}/api/annotation/frame`);
+        if (!res.ok) {
+            throw new Error('api_load_failed');
+        }
+        const blob = await res.blob();
+        img = new Image();
+        img.onload = () => {
+            canvas.width = img.width;
+            canvas.height = img.height;
+            points = [];
+            draw();
+        };
+        img.src = URL.createObjectURL(blob);
+    }
+
+    function loadFromSource() {
+        return new Promise((resolve, reject) => {
+            if (!sourceUrl) {
+                reject(new Error('no_source'));
+                return;
+            }
+            if (sourceType === 'image') {
+                img = new Image();
+                img.onload = () => {
+                    canvas.width = img.width;
+                    canvas.height = img.height;
+                    points = [];
+                    draw();
+                    resolve();
+                };
+                img.onerror = () => reject(new Error('image_load_failed'));
+                img.src = sourceUrl;
+                return;
+            }
+
+            const video = document.getElementById('sourceVideo');
+            video.onloadedmetadata = () => {
+                const target = Math.max(0, Math.min(video.duration / 2, video.duration - 0.1));
+                video.currentTime = isFinite(target) ? target : 0;
+            };
+            video.onseeked = () => {
+                canvas.width = video.videoWidth || 1280;
+                canvas.height = video.videoHeight || 720;
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                img = new Image();
+                img.src = canvas.toDataURL('image/jpeg');
+                points = [];
+                draw();
+                resolve();
+            };
+            video.onerror = () => reject(new Error('video_load_failed'));
+            video.src = sourceUrl;
+            video.load();
+        });
+    }
+
+    document.getElementById('loadBtn').onclick = async () => {
+        try {
+            await loadFromApi();
+        } catch (e) {
+            try {
+                await loadFromSource();
+            } catch (err) {
+                alert('加载失败，请确认已上传视频/图片并启动 Python 服务。');
+            }
+        }
+    };
+
+    document.getElementById('clearBtn').onclick = () => {
+        points = [];
+        draw();
+    };
+
+    document.getElementById('saveBtn').onclick = async () => {
+        if (points.length !== 4) {
+            alert('请先标注 4 个点');
+            return;
+        }
+        const payload = {
+            width: canvas.width,
+            height: canvas.height,
+            src_points: points.map(p => ({ x: p.x / canvas.width, y: p.y / canvas.height }))
+        };
+        const res = await fetch(`${pythonApiBaseUrl}/api/annotation/save`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (data.success) {
+            alert('保存成功');
+        } else {
+            alert('保存失败');
+        }
+    };
+
+    async function uploadProcessedToSpring(processedUrl) {
+        const absUrl = pythonApiBaseUrl + processedUrl;
+        const response = await fetch(absUrl);
+        if (!response.ok) {
+            throw new Error('failed_to_download');
+        }
+        const blob = await response.blob();
+        const filename = (processedUrl.split('/').pop() || 'processed_video.mp4');
+        const file = new File([blob], filename, { type: blob.type || 'video/mp4' });
+        const formData = new FormData();
+        formData.append('file', file);
+        const uploadRes = await fetch(`${springApiBaseUrl}/upload`, {
+            method: 'POST',
+            body: formData
+        });
+        const uploadData = await uploadRes.json().catch(() => ({}));
+        if (!uploadRes.ok || !uploadData.success) {
+            console.error('upload_failed', uploadRes.status, uploadData);
+            throw new Error('failed_to_upload');
+        }
+        try {
+            await fetch(`${springApiBaseUrl}/refresh`, { method: 'POST' });
+        } catch (e) {
+            console.warn('refresh_failed', e);
+        }
+        return uploadData.file && uploadData.file.name ? uploadData.file.name : filename;
+    }
+
+    document.getElementById('completeBtn').onclick = async () => {
+        const res = await fetch(`${pythonApiBaseUrl}/api/annotation/complete_stream`, { method: 'POST' });
+        const data = await res.json();
+        if (data.success && data.stream_url && data.job_id) {
+            const streamUrl = encodeURIComponent(pythonApiBaseUrl + data.stream_url);
+            const filename = data.original_filename ? `&filename=${encodeURIComponent(data.original_filename)}` : '';
+            window.location.href = `${springPageBaseUrl}/carControl.html?stream=1&type=line_press&job_id=${encodeURIComponent(data.job_id)}&stream_url=${streamUrl}${filename}`;
+        } else {
+            alert(data.detail || '处理失败');
+        }
+    };
+
+    if (sourceUrl) {
+        loadFromSource().catch(() => {
+            // Ignore on load, user can click "加载最新画面"
+        });
+    }
+
+    canvas.addEventListener('click', (e) => {
+        if (!img.src) return;
+        if (points.length >= 4) return;
+        const rect = canvas.getBoundingClientRect();
+        const x = (e.clientX - rect.left) * (canvas.width / rect.width);
+        const y = (e.clientY - rect.top) * (canvas.height / rect.height);
+        points.push({ x, y });
+        draw();
+    });
+</script>
+</body>
+</html>
